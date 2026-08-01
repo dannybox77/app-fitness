@@ -602,7 +602,7 @@ async function guardarPerfil(){
   };
   try{
     await db.collection('users').doc(currentUser.uid).collection('perfil').doc('data').set(data, {merge:true});
-    perfil = data;
+    perfil = Object.assign({}, perfil, data);
     showToast('Perfil guardado');
   }catch(e){ showToast('No se pudo guardar el perfil'); }
 }
