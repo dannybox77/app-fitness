@@ -156,6 +156,31 @@
           <div class="chip-opt" data-v="activo">Muy activo</div>
         </div>
       </div>
+      <div class="field">
+        <label>Experiencia entrenando</label>
+        <div class="chip-group" id="p-experiencia">
+          <div class="chip-opt" data-v="principiante">Principiante</div>
+          <div class="chip-opt" data-v="intermedio">Intermedio</div>
+          <div class="chip-opt" data-v="avanzado">Avanzado</div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field">
+          <label>¿Fumas?</label>
+          <div class="chip-group" id="p-fuma">
+            <div class="chip-opt" data-v="no">No</div>
+            <div class="chip-opt" data-v="si">Sí</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>¿Consumes alcohol?</label>
+          <div class="chip-group" id="p-alcohol">
+            <div class="chip-opt" data-v="no">No</div>
+            <div class="chip-opt" data-v="ocasional">Ocasional</div>
+            <div class="chip-opt" data-v="frecuente">Frecuente</div>
+          </div>
+        </div>
+      </div>
       <div class="two-col">
         <div class="field"><label>Horas de sueño</label><input type="number" id="p-sueno" min="0" max="24"></div>
         <div class="field"><label>Tipo de entrenamiento</label><input id="p-tipo" placeholder="Ej. Fuerza, cardio, mixto"></div>
@@ -189,7 +214,7 @@
           <div class="chip-opt" data-v="6">6</div>
         </div>
       </div>
-      <div class="field"><label>Restricciones o notas (opcional)</label><textarea id="p-restricciones" placeholder="Ej. lesión de rodilla, evitar sentadillas profundas"></textarea></div>
+      <div class="field"><label>Lesiones, condiciones de salud o restricciones físicas (opcional)</label><textarea id="p-restricciones" placeholder="Ej. lesión de rodilla, evitar sentadillas profundas, hipertensión"></textarea></div>
       <button class="btn primary" onclick="guardarPerfil()">Guardar perfil</button>
     </div>
   </div>
@@ -375,6 +400,24 @@ document.querySelectorAll('#p-sexo .chip-opt').forEach(c=>{
     c.classList.add('sel');
   });
 });
+document.querySelectorAll('#p-experiencia .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-experiencia .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+document.querySelectorAll('#p-fuma .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-fuma .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+document.querySelectorAll('#p-alcohol .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-alcohol .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
 document.querySelectorAll('#n-objetivo .chip-opt').forEach(c=>{
   c.addEventListener('click', ()=>{
     document.querySelectorAll('#n-objetivo .chip-opt').forEach(x=>x.classList.remove('sel'));
@@ -429,6 +472,9 @@ async function loadPerfil(){
   document.querySelectorAll('#p-objetivo .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.objetivo));
   document.querySelectorAll('#p-dias .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === String(perfil.diasSemana||'')));
   document.querySelectorAll('#p-sexo .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.sexo));
+  document.querySelectorAll('#p-experiencia .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.experiencia));
+  document.querySelectorAll('#p-fuma .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.fuma));
+  document.querySelectorAll('#p-alcohol .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.alcohol));
 }
 
 async function guardarPerfil(){
@@ -436,6 +482,9 @@ async function guardarPerfil(){
   const objetivoSel = document.querySelector('#p-objetivo .chip-opt.sel');
   const diasSel = document.querySelector('#p-dias .chip-opt.sel');
   const sexoSel = document.querySelector('#p-sexo .chip-opt.sel');
+  const experienciaSel = document.querySelector('#p-experiencia .chip-opt.sel');
+  const fumaSel = document.querySelector('#p-fuma .chip-opt.sel');
+  const alcoholSel = document.querySelector('#p-alcohol .chip-opt.sel');
   const data = {
     nombre: document.getElementById('p-nombre').value.trim(),
     edad: Number(document.getElementById('p-edad').value)||null,
@@ -447,6 +496,9 @@ async function guardarPerfil(){
     actividad: actividadSel ? actividadSel.dataset.v : '',
     diasSemana: diasSel ? Number(diasSel.dataset.v) : null,
     sexo: sexoSel ? sexoSel.dataset.v : '',
+    experiencia: experienciaSel ? experienciaSel.dataset.v : '',
+    fuma: fumaSel ? fumaSel.dataset.v : '',
+    alcohol: alcoholSel ? alcoholSel.dataset.v : '',
     restricciones: document.getElementById('p-restricciones').value.trim()
   };
   try{
