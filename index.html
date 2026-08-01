@@ -136,6 +136,7 @@
   <div class="tabs">
     <div class="tab active" id="tabPerfilBtn" onclick="switchTab('perfil')">Perfil</div>
     <div class="tab" id="tabRutinasBtn" onclick="switchTab('rutinas')">Rutinas</div>
+    <div class="tab" id="tabNutricionBtn" onclick="switchTab('nutricion')">Nutrición</div>
   </div>
 
   <div id="viewPerfil">
@@ -199,6 +200,34 @@
       <button class="btn primary" onclick="openRutinaModal()">+ Nueva rutina</button>
     </div>
     <div id="list"></div>
+  </div>
+
+  <div id="viewNutricion" style="display:none;">
+    <div class="card">
+      <div class="field">
+        <label>Objetivo alimenticio</label>
+        <div class="chip-group" id="n-objetivo">
+          <div class="chip-opt" data-v="bajar-peso">Bajar de peso</div>
+          <div class="chip-opt" data-v="ganar-musculo">Ganar músculo</div>
+          <div class="chip-opt" data-v="comer-saludable">Comer más saludable</div>
+          <div class="chip-opt" data-v="mantenimiento">Mantenimiento</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Comidas que haces normalmente</label>
+        <div class="chip-group" id="n-comidas">
+          <div class="chip-opt" data-v="desayuno">Desayuno</div>
+          <div class="chip-opt" data-v="almuerzo">Almuerzo</div>
+          <div class="chip-opt" data-v="cena">Cena</div>
+          <div class="chip-opt" data-v="meriendas">Meriendas</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Restricciones o alergias alimenticias (opcional)</label>
+        <textarea id="n-restricciones" placeholder="Ej. vegetariano, sin gluten, alergia a mariscos"></textarea>
+      </div>
+      <button class="btn primary" onclick="guardarNutricion()">Guardar perfil nutricional</button>
+    </div>
   </div>
 </div>
 </div>
@@ -302,6 +331,7 @@ auth.onAuthStateChanged(user=>{
     document.getElementById('appScreen').style.display = 'block';
     document.getElementById('userBadge').textContent = user.email;
     loadPerfil();
+    loadNutricion();
     subscribeRutinas();
   } else {
     currentUser = null;
@@ -315,8 +345,10 @@ auth.onAuthStateChanged(user=>{
 function switchTab(tab){
   document.getElementById('tabPerfilBtn').classList.toggle('active', tab==='perfil');
   document.getElementById('tabRutinasBtn').classList.toggle('active', tab==='rutinas');
+  document.getElementById('tabNutricionBtn').classList.toggle('active', tab==='nutricion');
   document.getElementById('viewPerfil').style.display = tab==='perfil' ? 'block' : 'none';
   document.getElementById('viewRutinas').style.display = tab==='rutinas' ? 'block' : 'none';
+  document.getElementById('viewNutricion').style.display = tab==='nutricion' ? 'block' : 'none';
 }
 
 document.querySelectorAll('#p-actividad .chip-opt').forEach(c=>{
@@ -343,6 +375,43 @@ document.querySelectorAll('#p-sexo .chip-opt').forEach(c=>{
     c.classList.add('sel');
   });
 });
+document.querySelectorAll('#n-objetivo .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#n-objetivo .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+document.querySelectorAll('#n-comidas .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{ c.classList.toggle('sel'); });
+});
+
+let nutricion = {};
+
+async function loadNutricion(){
+  try{
+    const doc = await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').get();
+    nutricion = doc.exists ? doc.data() : {};
+  }catch(e){ nutricion = {}; }
+  document.getElementById('n-restricciones').value = nutricion.restricciones || '';
+  document.querySelectorAll('#n-objetivo .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === nutricion.objetivo));
+  const comidasSel = nutricion.comidas || [];
+  document.querySelectorAll('#n-comidas .chip-opt').forEach(c=>c.classList.toggle('sel', comidasSel.includes(c.dataset.v)));
+}
+
+async function guardarNutricion(){
+  const objetivoSel = document.querySelector('#n-objetivo .chip-opt.sel');
+  const comidasSel = Array.from(document.querySelectorAll('#n-comidas .chip-opt.sel')).map(c=>c.dataset.v);
+  const data = {
+    objetivo: objetivoSel ? objetivoSel.dataset.v : '',
+    comidas: comidasSel,
+    restricciones: document.getElementById('n-restricciones').value.trim()
+  };
+  try{
+    await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').set(data, {merge:true});
+    nutricion = data;
+    showToast('Perfil nutricional guardado');
+  }catch(e){ showToast('No se pudo guardar el perfil nutricional'); }
+}
 
 async function loadPerfil(){
   try{
