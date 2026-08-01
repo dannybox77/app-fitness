@@ -17,6 +17,8 @@ exports.handler = async function (event) {
 - Días de entrenamiento por semana: ${perfil.diasSemana || 3}
 - Restricciones o notas: ${perfil.restricciones || 'ninguna'}
 
+Ajusta el énfasis del plan según el sexo indicado: si es "mujer", dale más volumen (más ejercicios y series) a piernas y glúteos; si es "hombre", dale más volumen a pecho, espalda y brazos; si no se especificó, reparte el volumen de forma equilibrada entre todos los grupos musculares.
+
 Devuelve ÚNICAMENTE un array JSON válido (sin texto antes ni después, sin markdown), con esta forma exacta:
 [
   {
@@ -27,7 +29,7 @@ Devuelve ÚNICAMENTE un array JSON válido (sin texto antes ni después, sin mar
   }
 ]
 
-El array debe tener exactamente ${perfil.diasSemana || 3} elementos (uno por día). Cada día debe tener entre 4 y 8 ejercicios, apropiados para el objetivo y las restricciones indicadas. No repitas el mismo grupo muscular en días consecutivos si hay más de 2 días. Responde solo con el JSON.`;
+El array debe tener exactamente ${perfil.diasSemana || 3} elementos (uno por día). Cada día debe tener entre 4 y 8 ejercicios, apropiados para el objetivo, el sexo y las restricciones indicadas. No repitas el mismo grupo muscular en días consecutivos si hay más de 2 días. Responde solo con el JSON.`;
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
