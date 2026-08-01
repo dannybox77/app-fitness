@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Fitness — Perfil y rutinas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --ink:#152231; --ink-soft:#4a5a6b; --paper:#eef1f4; --card:#ffffff; --line:#d7dee5;
+    --teal:#1f6f78; --teal-deep:#124047; --amber:#c9862c; --red:#b8394a; --green:#3c8c63;
+    --shadow: 0 1px 2px rgba(21,34,49,0.06), 0 8px 24px rgba(21,34,49,0.06);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:820px;margin:0 auto;padding:28px 20px 80px;}
+
+  header.top{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:12px;}
+  .brand{display:flex;flex-direction:column;gap:2px;}
+  .brand .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-deep);font-weight:500;}
+  .brand h1{font-family:'Space Grotesk',sans-serif;font-size:28px;margin:0;font-weight:700;letter-spacing:-0.01em;}
+  .top-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .user-badge{font-size:12px;color:var(--ink-soft);}
+
+  button{font-family:'Inter',sans-serif;cursor:pointer;}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;border-radius:8px;font-size:13.5px;font-weight:600;display:inline-flex;align-items:center;gap:6px;transition:.15s;}
+  .btn:hover{border-color:var(--teal);color:var(--teal-deep);}
+  .btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .btn.primary:hover{background:var(--teal-deep);border-color:var(--teal-deep);color:#fff;}
+
+  .tabs{display:flex;gap:6px;margin-bottom:20px;border-bottom:1px solid var(--line);}
+  .tab{padding:10px 4px;margin-right:20px;font-size:14.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--ink);border-bottom-color:var(--teal);}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px;}
+  .field{margin-bottom:13px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.03em;}
+  .field input, .field textarea, .field select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-family:'Inter',sans-serif;font-size:13.5px;color:var(--ink);background:#fbfcfd;}
+  .field textarea{resize:vertical;min-height:56px;}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .chip-group{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip-opt{padding:8px 14px;border-radius:20px;border:1px solid var(--line);background:#fbfcfd;font-size:12.5px;font-weight:600;color:var(--ink-soft);cursor:pointer;user-select:none;}
+  .chip-opt.sel{background:var(--teal);border-color:var(--teal);color:#fff;}
+
+  #list{display:flex;flex-direction:column;gap:14px;}
+  .rutina-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);}
+  .rutina-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px;}
+  .rutina-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px;}
+  .badge{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:500;padding:3px 9px;border-radius:5px;background:#e8f3ec;color:var(--green);white-space:nowrap;text-transform:uppercase;letter-spacing:.03em;}
+  .ejercicio-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line);}
+  .ejercicio-row:first-of-type{border-top:1px solid var(--line);margin-top:10px;}
+  .ej-thumb{width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--paper);border:1px solid var(--line);}
+  .ej-thumb-empty{width:44px;height:44px;border-radius:8px;flex-shrink:0;background:var(--paper);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--ink-soft);}
+  .ej-info{flex:1;min-width:0;}
+  .ej-name{font-weight:600;font-size:14px;}
+  .ej-meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .ej-link{font-size:12px;font-weight:600;color:var(--teal-deep);text-decoration:none;white-space:nowrap;}
+  .ej-link:hover{text-decoration:underline;}
+  .rutina-actions{display:flex;gap:14px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:12.5px;}
+  .rutina-actions a{color:var(--teal-deep);font-weight:600;cursor:pointer;text-decoration:none;}
+  .rutina-actions a.del{color:var(--red);}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--ink-soft);}
+  .empty .big{font-family:'Space Grotesk',sans-serif;font-size:18px;color:var(--ink);margin-bottom:6px;font-weight:600;}
+
+  /* LOGIN */
+  #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--paper);}
+  .login-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:32px;width:100%;max-width:380px;box-shadow:var(--shadow);}
+  .login-card h1{font-family:'Space Grotesk',sans-serif;font-size:22px;margin:0 0 4px;}
+  .login-card .sub{font-size:13px;color:var(--ink-soft);margin-bottom:22px;}
+  .login-err{background:#fbebec;color:#7a2531;border:1px solid #f1c9cd;border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:14px;display:none;}
+  .login-toggle{text-align:center;margin-top:14px;font-size:12.5px;color:var(--ink-soft);}
+  .login-toggle a{color:var(--teal-deep);font-weight:600;cursor:pointer;}
+  #appScreen{display:none;}
+
+  /* MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(21,34,49,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:40px 20px;overflow-y:auto;}
+  .overlay.show{display:flex;}
+  .modal{background:var(--card);border-radius:14px;padding:26px;width:100%;max-width:600px;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal h2{font-family:'Space Grotesk',sans-serif;font-size:19px;margin:0 0 16px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+
+  .ej-form-row{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px;background:#fbfcfd;position:relative;}
+  .ej-form-row .remove-ej{position:absolute;top:10px;right:10px;color:var(--red);cursor:pointer;font-size:13px;font-weight:700;}
+  .ej-preview{display:flex;align-items:center;gap:8px;margin-top:6px;}
+  .ej-preview img{width:36px;height:36px;border-radius:6px;object-fit:cover;border:1px solid var(--line);}
+
+  #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99;font-weight:500;}
+  #toast.show{opacity:1;}
+
+  @media(max-width:640px){
+    .two-col, .three-col{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <h1 id="loginTitle">Iniciar sesión</h1>
+    <div class="sub">Tu perfil y rutinas de entrenamiento, en cualquier dispositivo.</div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="field">
+      <label>Correo</label>
+      <input type="email" id="login-email" placeholder="tucorreo@ejemplo.com">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="Mínimo 6 caracteres">
+    </div>
+    <button class="btn primary" style="width:100%;justify-content:center;" id="loginBtn" onclick="handleAuth()">Iniciar sesión</button>
+    <div class="login-toggle" id="loginToggleWrap">
+      ¿No tienes cuenta? <a onclick="toggleAuthMode()">Crear una</a>
+    </div>
+  </div>
+</div>
+
+<div id="appScreen">
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Fitness</span>
+      <h1>Perfil y rutinas</h1>
+    </div>
+    <div class="top-actions">
+      <span class="user-badge" id="userBadge"></span>
+      <button class="btn" onclick="cerrarSesion()">Salir</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" id="tabPerfilBtn" onclick="switchTab('perfil')">Perfil</div>
+    <div class="tab" id="tabRutinasBtn" onclick="switchTab('rutinas')">Rutinas</div>
+  </div>
+
+  <div id="viewPerfil">
+    <div class="card">
+      <div class="field"><label>Nombre</label><input id="p-nombre" placeholder="Tu nombre"></div>
+      <div class="three-col">
+        <div class="field"><label>Edad</label><input type="number" id="p-edad" min="0"></div>
+        <div class="field"><label>Peso (kg)</label><input type="number" id="p-peso" min="0"></div>
+        <div class="field"><label>Altura (cm)</label><input type="number" id="p-altura" min="0"></div>
+      </div>
+      <div class="field">
+        <label>Nivel de actividad</label>
+        <div class="chip-group" id="p-actividad">
+          <div class="chip-opt" data-v="sedentario">Sedentario</div>
+          <div class="chip-opt" data-v="ligero">Ligero</div>
+          <div class="chip-opt" data-v="moderado">Moderado</div>
+          <div class="chip-opt" data-v="activo">Muy activo</div>
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field"><label>Horas de sueño</label><input type="number" id="p-sueno" min="0" max="24"></div>
+        <div class="field"><label>Tipo de entrenamiento</label><input id="p-tipo" placeholder="Ej. Fuerza, cardio, mixto"></div>
+      </div>
+      <div class="field">
+        <label>Sexo (opcional — ajusta el énfasis de la rutina)</label>
+        <div class="chip-group" id="p-sexo">
+          <div class="chip-opt" data-v="mujer">Mujer</div>
+          <div class="chip-opt" data-v="hombre">Hombre</div>
+          <div class="chip-opt" data-v="prefiero-no-decir">Prefiero no decir</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Objetivo principal</label>
+        <div class="chip-group" id="p-objetivo">
+          <div class="chip-opt" data-v="perder-grasa">Perder grasa</div>
+          <div class="chip-opt" data-v="ganar-musculo">Ganar músculo</div>
+          <div class="chip-opt" data-v="recomposicion">Recomposición</div>
+          <div class="chip-opt" data-v="salud-general">Salud general</div>
+          <div class="chip-opt" data-v="rendimiento">Rendimiento deportivo</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Días de entrenamiento por semana</label>
+        <div class="chip-group" id="p-dias">
+          <div class="chip-opt" data-v="1">1</div>
+          <div class="chip-opt" data-v="2">2</div>
+          <div class="chip-opt" data-v="3">3</div>
+          <div class="chip-opt" data-v="4">4</div>
+          <div class="chip-opt" data-v="5">5</div>
+          <div class="chip-opt" data-v="6">6</div>
+        </div>
+      </div>
+      <div class="field"><label>Restricciones o notas (opcional)</label><textarea id="p-restricciones" placeholder="Ej. lesión de rodilla, evitar sentadillas profundas"></textarea></div>
+      <button class="btn primary" onclick="guardarPerfil()">Guardar perfil</button>
+    </div>
+  </div>
+
+  <div id="viewRutinas" style="display:none;">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <button class="btn" onclick="generarPlanSemanal()">🗓️ Generar plan semanal</button>
+      <button class="btn" onclick="generarConIA()">🤖 Generar con IA (personalizado)</button>
+      <button class="btn primary" onclick="openRutinaModal()">+ Nueva rutina</button>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Nueva rutina</h2>
+    <input type="hidden" id="editId">
+    <div class="field"><label>Nombre de la rutina</label><input id="r-nombre" placeholder="Ej. Día de piernas"></div>
+    <div class="field">
+      <label>Objetivo</label>
+      <select id="r-objetivo">
+        <option value="perder-grasa">Perder grasa</option>
+        <option value="ganar-musculo">Ganar músculo</option>
+        <option value="recomposicion">Recomposición</option>
+        <option value="salud-general">Salud general</option>
+        <option value="rendimiento">Rendimiento deportivo</option>
+      </select>
+    </div>
+    <div class="field" style="margin-top:18px;">
+      <label>Ejercicios</label>
+      <div id="ejerciciosForm"></div>
+      <button class="btn" onclick="addEjercicioRow()">+ Agregar ejercicio en blanco</button>
+      <button class="btn" onclick="toggleLibrary()">+ Agregar desde biblioteca</button>
+      <div id="libraryPanel" style="display:none;margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:14px;background:#fbfcfd;">
+        <div class="chip-group" id="libGroups"></div>
+        <div id="libExercises" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn primary" onclick="guardarRutina()">Guardar rutina</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAH5FP9zXez3jNufiLLgGBopwsgyJbBiCI",
+  authDomain: "mi-bitacora-trabajos-bn.firebaseapp.com",
+  projectId: "mi-bitacora-trabajos-bn",
+  storageBucket: "mi-bitacora-trabajos-bn.firebasestorage.app",
+  messagingSenderId: "981470612337",
+  appId: "1:981470612337:web:c1cb363e61e9324b4e44d0"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentUser = null;
+let authMode = 'login';
+let perfil = {};
+let rutinas = [];
+let unsubRutinas = null;
+let ejercicioCount = 0;
+
+function toggleAuthMode(){
+  authMode = authMode === 'login' ? 'signup' : 'login';
+  document.getElementById('loginTitle').textContent = authMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta';
+  document.getElementById('loginBtn').textContent = authMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta';
+  document.getElementById('loginToggleWrap').innerHTML = authMode === 'login'
+    ? '¿No tienes cuenta? <a onclick="toggleAuthMode()">Crear una</a>'
+    : '¿Ya tienes cuenta? <a onclick="toggleAuthMode()">Inicia sesión</a>';
+  document.getElementById('loginErr').style.display = 'none';
+}
+function showLoginError(msg){
+  const el = document.getElementById('loginErr');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+async function handleAuth(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  if(!email || !pass){ showLoginError('Completa correo y contraseña.'); return; }
+  try{
+    if(authMode === 'login'){
+      await auth.signInWithEmailAndPassword(email, pass);
+    } else {
+      await auth.createUserWithEmailAndPassword(email, pass);
+    }
+  }catch(e){
+    const map = {
+      'auth/invalid-email':'El correo no es válido.',
+      'auth/user-not-found':'No existe una cuenta con ese correo.',
+      'auth/wrong-password':'Contraseña incorrecta.',
+      'auth/email-already-in-use':'Ya existe una cuenta con ese correo.',
+      'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
+      'auth/invalid-credential':'Correo o contraseña incorrectos.'
+    };
+    showLoginError(map[e.code] || 'Ocurrió un error, intenta de nuevo.');
+  }
+}
+function cerrarSesion(){ auth.signOut(); }
+
+auth.onAuthStateChanged(user=>{
+  if(user){
+    currentUser = user;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    document.getElementById('userBadge').textContent = user.email;
+    loadPerfil();
+    subscribeRutinas();
+  } else {
+    currentUser = null;
+    if(unsubRutinas){ unsubRutinas(); unsubRutinas = null; }
+    perfil = {}; rutinas = [];
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+  }
+});
+
+function switchTab(tab){
+  document.getElementById('tabPerfilBtn').classList.toggle('active', tab==='perfil');
+  document.getElementById('tabRutinasBtn').classList.toggle('active', tab==='rutinas');
+  document.getElementById('viewPerfil').style.display = tab==='perfil' ? 'block' : 'none';
+  document.getElementById('viewRutinas').style.display = tab==='rutinas' ? 'block' : 'none';
+}
+
+document.querySelectorAll('#p-actividad .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-actividad .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+document.querySelectorAll('#p-objetivo .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-objetivo .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+document.querySelectorAll('#p-dias .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-dias .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+document.querySelectorAll('#p-sexo .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-sexo .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
+
+async function loadPerfil(){
+  try{
+    const doc = await db.collection('users').doc(currentUser.uid).collection('perfil').doc('data').get();
+    perfil = doc.exists ? doc.data() : {};
+  }catch(e){ perfil = {}; }
+  document.getElementById('p-nombre').value = perfil.nombre || '';
+  document.getElementById('p-edad').value = perfil.edad || '';
+  document.getElementById('p-peso').value = perfil.peso || '';
+  document.getElementById('p-altura').value = perfil.altura || '';
+  document.getElementById('p-sueno').value = perfil.sueno || '';
+  document.getElementById('p-tipo').value = perfil.tipo || '';
+  document.getElementById('p-restricciones').value = perfil.restricciones || '';
+  document.querySelectorAll('#p-actividad .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.actividad));
+  document.querySelectorAll('#p-objetivo .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.objetivo));
+  document.querySelectorAll('#p-dias .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === String(perfil.diasSemana||'')));
+  document.querySelectorAll('#p-sexo .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.sexo));
+}
+
+async function guardarPerfil(){
+  const actividadSel = document.querySelector('#p-actividad .chip-opt.sel');
+  const objetivoSel = document.querySelector('#p-objetivo .chip-opt.sel');
+  const diasSel = document.querySelector('#p-dias .chip-opt.sel');
+  const sexoSel = document.querySelector('#p-sexo .chip-opt.sel');
+  const data = {
+    nombre: document.getElementById('p-nombre').value.trim(),
+    edad: Number(document.getElementById('p-edad').value)||null,
+    peso: Number(document.getElementById('p-peso').value)||null,
+    altura: Number(document.getElementById('p-altura').value)||null,
+    sueno: Number(document.getElementById('p-sueno').value)||null,
+    tipo: document.getElementById('p-tipo').value.trim(),
+    objetivo: objetivoSel ? objetivoSel.dataset.v : '',
+    actividad: actividadSel ? actividadSel.dataset.v : '',
+    diasSemana: diasSel ? Number(diasSel.dataset.v) : null,
+    sexo: sexoSel ? sexoSel.dataset.v : '',
+    restricciones: document.getElementById('p-restricciones').value.trim()
+  };
+  try{
+    await db.collection('users').doc(currentUser.uid).collection('perfil').doc('data').set(data, {merge:true});
+    perfil = data;
+    showToast('Perfil guardado');
+  }catch(e){ showToast('No se pudo guardar el perfil'); }
+}
+
+function rutinasCol(){ return db.collection('users').doc(currentUser.uid).collection('rutinas'); }
+
+function subscribeRutinas(){
+  unsubRutinas = rutinasCol().onSnapshot(snap=>{
+    rutinas = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderRutinas();
+  }, err=>{ showToast('No se pudo sincronizar: '+err.message); });
+}
+
+const objetivoLabels = {
+  'perder-grasa':'Perder grasa', 'ganar-musculo':'Ganar músculo', 'recomposicion':'Recomposición',
+  'salud-general':'Salud general', 'rendimiento':'Rendimiento deportivo'
+};
+
+const grupoLabels = {
+  pecho:'Pecho', espalda:'Espalda', biceps:'Bíceps', triceps:'Tríceps', antebrazo:'Antebrazo',
+  cuadriceps:'Cuádriceps', femorales:'Femorales', gluteos:'Glúteos', pantorrillas:'Pantorrillas'
+};
+
+const gruposEjercicios = {
+  pecho: ['Press de banca', 'Press inclinado con mancuernas', 'Aperturas con mancuernas', 'Fondos en paralelas', 'Flexiones de brazos (push-ups)'],
+  espalda: ['Dominadas (pull-ups)', 'Remo con barra', 'Remo con mancuerna', 'Jalón al pecho en polea', 'Peso muerto', 'Face pull'],
+  biceps: ['Curl con barra', 'Curl con mancuernas alternado', 'Curl martillo', 'Curl concentrado'],
+  triceps: ['Press francés', 'Extensión de tríceps en polea', 'Fondos en banco (bench dips)', 'Patada de tríceps'],
+  antebrazo: ['Curl de muñeca', 'Curl de muñeca invertido', "Paseo del granjero (farmer's walk)", 'Dead hang (colgarse de la barra)'],
+  cuadriceps: ['Sentadilla', 'Prensa de piernas', 'Zancadas', 'Extensión de cuádriceps en máquina', 'Sentadilla búlgara'],
+  femorales: ['Peso muerto rumano', 'Curl femoral en máquina', 'Buenos días (good mornings)'],
+  gluteos: ['Hip thrust (empuje de cadera)', 'Puente de glúteo', 'Patada de glúteo en polea', 'Sentadilla sumo', 'Zancada búlgara'],
+  pantorrillas: ['Elevación de talones de pie', 'Elevación de talones sentado', 'Saltos de cuerda']
+};
+
+function splitSemanal(dias){
+  const push = ['pecho','triceps'];
+  const pull = ['espalda','biceps'];
+  const inferior = ['cuadriceps','femorales','gluteos','pantorrillas'];
+  const pushDia = {nombre:'Empuje (pecho y tríceps)', grupos:push};
+  const pullDia = {nombre:'Jalón (espalda y bíceps)', grupos:pull};
+  const piernasDia = {nombre:'Piernas y glúteos', grupos:inferior};
+  switch(Number(dias)){
+    case 1:
+      return [{nombre:'Cuerpo completo', grupos:[...push, ...pull, 'antebrazo', ...inferior]}];
+    case 2:
+      return [{nombre:'Tren superior (pecho, espalda, brazos)', grupos:[...push, ...pull, 'antebrazo']}, piernasDia];
+    case 3:
+      return [pushDia, pullDia, piernasDia];
+    case 4:
+      return [pushDia, pullDia, piernasDia, {nombre:'Brazos y antebrazo', grupos:['biceps','triceps','antebrazo']}];
+    case 5:
+      return [pushDia, pullDia, piernasDia, pushDia, pullDia];
+    case 6:
+      return [pushDia, pullDia, piernasDia, pushDia, pullDia, piernasDia];
+    default:
+      return [pushDia, pullDia, piernasDia];
+  }
+}
+
+async function generarPlanSemanal(){
+  if(!perfil.objetivo){
+    showToast('Primero define tu objetivo en la pestaña Perfil');
+    switchTab('perfil');
+    return;
+  }
+  if(!perfil.diasSemana){
+    showToast('Primero indica cuántos días entrenas por semana en tu Perfil');
+    switchTab('perfil');
+    return;
+  }
+  const plan = splitSemanal(perfil.diasSemana);
+  const anteriores = rutinas.filter(r=>r.diaPlan);
+  const aviso = anteriores.length
+    ? `Esto va a borrar tus ${anteriores.length} rutina(s) de plan semanal anteriores y crear ${plan.length} nueva(s). ¿Continuar?`
+    : `Esto va a crear ${plan.length} rutina(s) nueva(s), una por cada día de tu semana. ¿Continuar?`;
+  if(!confirm(aviso)) return;
+
+  const series = seriesParaObjetivo(perfil.objetivo);
+  try{
+    for(const r of anteriores){
+      await rutinasCol().doc(r.id).delete();
+    }
+    for(let i=0; i<plan.length; i++){
+      const diaInfo = plan[i];
+      let cantidad = diaInfo.grupos.length <= 2 ? 3 : diaInfo.grupos.length <= 4 ? 2 : 1;
+      // pequeño ajuste de énfasis según el perfil, siempre editable después
+      const esDiaPiernas = diaInfo.nombre.includes('Piernas');
+      const esDiaEmpuje = diaInfo.nombre.includes('Empuje');
+      let nota = '';
+      if(perfil.sexo === 'mujer' && esDiaPiernas){ cantidad += 1; nota = 'Ajustada para: Mujer — énfasis extra en piernas y glúteos'; }
+      if(perfil.sexo === 'hombre' && esDiaEmpuje){ cantidad += 1; nota = 'Ajustada para: Hombre — énfasis extra en pecho y tríceps'; }
+      const ejercicios = [];
+      diaInfo.grupos.forEach(g=>{
+        const iconUri = grupoIconDataUri(g);
+        gruposEjercicios[g].slice(0, cantidad).forEach(nombre=>{
+          ejercicios.push({ nombre, series, descanso:'', link: ytSearchLink(nombre), imagen: iconUri });
+        });
+      });
+      await rutinasCol().add({
+        nombre: `Día ${i+1} — ${diaInfo.nombre}`,
+        objetivo: perfil.objetivo,
+        notaPerfil: nota,
+        diaPlan: i+1,
+        ejercicios
+      });
+    }
+    showToast('Plan semanal generado');
+  }catch(e){ showToast('No se pudo generar el plan completo'); }
+}
+
+async function generarConIA(){
+  if(!perfil.objetivo){
+    showToast('Primero define tu objetivo en la pestaña Perfil');
+    switchTab('perfil');
+    return;
+  }
+  if(!perfil.diasSemana){
+    showToast('Primero indica cuántos días entrenas por semana en tu Perfil');
+    switchTab('perfil');
+    return;
+  }
+  const anteriores = rutinas.filter(r=>r.diaPlan);
+  const aviso = anteriores.length
+    ? `La IA va a generar un plan nuevo y personalizado, reemplazando tus ${anteriores.length} rutina(s) de plan semanal actuales. ¿Continuar?`
+    : `La IA va a generar un plan de ${perfil.diasSemana} día(s) personalizado según tu perfil. ¿Continuar?`;
+  if(!confirm(aviso)) return;
+
+  showToast('Generando con IA... esto puede tardar unos segundos');
+  try{
+    const resp = await fetch('/.netlify/functions/generate-routine', {
+      method: 'POST',
+      headers: {'content-type':'application/json'},
+      body: JSON.stringify(perfil)
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      showToast('Error de la IA: ' + (data.error ? JSON.stringify(data.error).slice(0,120) : 'desconocido'));
+      return;
+    }
+    let texto = (data.texto || '').trim();
+    // por si el modelo agrega texto extra alrededor del JSON
+    const inicio = texto.indexOf('[');
+    const fin = texto.lastIndexOf(']');
+    if(inicio !== -1 && fin !== -1) texto = texto.slice(inicio, fin+1);
+    const dias = JSON.parse(texto);
+
+    for(const r of anteriores){
+      await rutinasCol().doc(r.id).delete();
+    }
+    for(let i=0; i<dias.length; i++){
+      const dia = dias[i];
+      const ejercicios = (dia.ejercicios || []).map(ej => ({
+        nombre: ej.nombre || '', series: ej.series || '', descanso: ej.descanso || '',
+        link: ytSearchLink(ej.nombre || ''), imagen: ''
+      }));
+      await rutinasCol().add({
+        nombre: dia.nombre || `Día ${i+1}`,
+        objetivo: perfil.objetivo,
+        notaPerfil: 'Generado por IA según tu perfil completo',
+        diaPlan: i+1,
+        ejercicios
+      });
+    }
+    showToast('Plan generado por IA');
+  }catch(e){
+    showToast('No se pudo interpretar la respuesta de la IA, intenta de nuevo');
+  }
+}
+
+function seriesParaObjetivo(obj){
+  const map = {
+    'ganar-musculo': '4x8-10',
+    'perder-grasa': '3x15',
+    'recomposicion': '3x10-12',
+    'salud-general': '3x12',
+    'rendimiento': '4x6 (explosivo)'
+  };
+  return map[obj] || '3x12';
+}
+
+function ytSearchLink(nombreEjercicio){
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(nombreEjercicio + ' técnica correcta');
+}
+
+const bodyPartShapes = {
+  torsoUpper: '<rect x="30" y="35" width="40" height="28" rx="8"/>',
+  torsoLower: '<rect x="30" y="63" width="40" height="25" rx="8"/>',
+  armLUpper: '<rect x="14" y="40" width="12" height="32" rx="6"/>',
+  armRUpper: '<rect x="74" y="40" width="12" height="32" rx="6"/>',
+  armLLower: '<rect x="14" y="72" width="12" height="26" rx="6"/>',
+  armRLower: '<rect x="74" y="72" width="12" height="26" rx="6"/>',
+  hips: '<rect x="28" y="88" width="44" height="14" rx="6"/>',
+  legLUpper: '<rect x="30" y="102" width="16" height="44" rx="6"/>',
+  legRUpper: '<rect x="54" y="102" width="16" height="44" rx="6"/>',
+  legLLower: '<rect x="30" y="146" width="16" height="44" rx="6"/>',
+  legRLower: '<rect x="54" y="146" width="16" height="44" rx="6"/>'
+};
+const grupoIconParts = {
+  pecho:['torsoUpper'], espalda:['torsoLower'], biceps:['armLUpper','armRUpper'],
+  triceps:['armLUpper','armRUpper'], antebrazo:['armLLower','armRLower'],
+  cuadriceps:['legLUpper','legRUpper'], femorales:['legLUpper','legRUpper'],
+  gluteos:['hips'], pantorrillas:['legLLower','legRLower']
+};
+const grupoIconColor = {
+  pecho:'#1f6f78', espalda:'#124047', biceps:'#c9862c', triceps:'#b8394a',
+  antebrazo:'#3c8c63', cuadriceps:'#1f6f78', femorales:'#c9862c', gluteos:'#b8394a', pantorrillas:'#3c8c63'
+};
+
+function grupoIconDataUri(grupo){
+  const activos = grupoIconParts[grupo] || [];
+  const color = grupoIconColor[grupo] || '#1f6f78';
+  let svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">';
+  svg += '<circle cx="50" cy="18" r="14" fill="#c7d0d8" stroke="#9aa7b3" stroke-width="1"/>';
+  svg += '<g fill="#c7d0d8" stroke="#9aa7b3" stroke-width="1">';
+  Object.keys(bodyPartShapes).forEach(k=>{ if(!activos.includes(k)) svg += bodyPartShapes[k]; });
+  svg += '</g>';
+  svg += `<g fill="${color}" stroke="${color}" stroke-width="1">`;
+  activos.forEach(k=>{ svg += bodyPartShapes[k]; });
+  svg += '</g></svg>';
+  return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+}
+
+function toggleLibrary(){
+  const panel = document.getElementById('libraryPanel');
+  const willShow = panel.style.display === 'none';
+  panel.style.display = willShow ? 'block' : 'none';
+  if(willShow) renderLibGroups();
+}
+
+function renderLibGroups(){
+  const box = document.getElementById('libGroups');
+  box.innerHTML = Object.keys(gruposEjercicios).map(g=>
+    `<div class="chip-opt" onclick="showLibExercises('${g}', this)">${grupoLabels[g]}</div>`
+  ).join('');
+  document.getElementById('libExercises').innerHTML = '';
+}
+
+function showLibExercises(g, el){
+  document.querySelectorAll('#libGroups .chip-opt').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  const box = document.getElementById('libExercises');
+  box.innerHTML = gruposEjercicios[g].map(nombre=>
+    `<button type="button" class="btn" style="font-size:12px;" onclick="addFromLibrary('${escapeAttr(nombre)}','${g}')">+ ${escapeHtml(nombre)}</button>`
+  ).join('');
+}
+
+function addFromLibrary(nombre, grupo){
+  const series = seriesParaObjetivo(document.getElementById('r-objetivo').value);
+  addEjercicioRow({ nombre, series, descanso:'', link: ytSearchLink(nombre), imagen: grupoIconDataUri(grupo) });
+  showToast('Ejercicio agregado');
+}
+
+function escapeHtml(str){
+  return (str||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(str){ return escapeHtml(str).replace(/`/g,'&#96;'); }
+
+function renderRutinas(){
+  const list = document.getElementById('list');
+  if(rutinas.length===0){
+    list.innerHTML = `<div class="empty"><div class="big">Aún no tienes rutinas</div>Crea tu primera rutina para empezar a entrenar con orden.</div>`;
+    return;
+  }
+  const ordenadas = rutinas.slice().sort((a,b)=>{
+    if(a.diaPlan && b.diaPlan) return a.diaPlan - b.diaPlan;
+    if(a.diaPlan && !b.diaPlan) return -1;
+    if(!a.diaPlan && b.diaPlan) return 1;
+    return 0;
+  });
+  list.innerHTML = ordenadas.map(r=>{
+    const ejercicios = r.ejercicios || [];
+    const ejHtml = ejercicios.map(ej=>{
+      const thumb = ej.imagen
+        ? `<img class="ej-thumb" src="${escapeAttr(ej.imagen)}" alt="" onerror="this.style.display='none'">`
+        : `<div class="ej-thumb-empty">🏋️</div>`;
+      const linkHtml = ej.link ? `<a class="ej-link" href="${escapeAttr(ej.link)}" target="_blank" rel="noopener">Ver ejercicio ↗</a>` : '';
+      return `<div class="ejercicio-row">
+        ${thumb}
+        <div class="ej-info">
+          <div class="ej-name">${escapeHtml(ej.nombre)}</div>
+          <div class="ej-meta">${escapeHtml(ej.series||'')}${ej.descanso ? ' · descanso '+escapeHtml(ej.descanso) : ''}</div>
+        </div>
+        ${linkHtml}
+      </div>`;
+    }).join('');
+    return `<div class="rutina-card">
+      <div class="rutina-top">
+        <div class="rutina-title">${escapeHtml(r.nombre)}</div>
+        <span class="badge">${objetivoLabels[r.objetivo]||r.objetivo||''}</span>
+      </div>
+      ${r.notaPerfil ? `<div class="ej-meta" style="color:var(--teal-deep);font-weight:600;margin-bottom:6px;">${escapeHtml(r.notaPerfil)}</div>` : ''}
+      ${ejHtml || '<div class="ej-meta">Sin ejercicios todavía.</div>'}
+      <div class="rutina-actions">
+        <a onclick="openRutinaModal('${r.id}')">Editar</a>
+        <a class="del" onclick="eliminarRutina('${r.id}')">Eliminar</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addEjercicioRow(data){
+  ejercicioCount++;
+  const id = 'ej-'+ejercicioCount;
+  const d = data || {};
+  const div = document.createElement('div');
+  div.className = 'ej-form-row';
+  div.id = id;
+  div.innerHTML = `
+    <span class="remove-ej" onclick="document.getElementById('${id}').remove()">✕</span>
+    <div class="two-col">
+      <div class="field"><label>Nombre del ejercicio</label><input class="ej-nombre" value="${escapeAttr(d.nombre||'')}" placeholder="Ej. Sentadilla"></div>
+      <div class="field"><label>Series x repeticiones</label><input class="ej-series" value="${escapeAttr(d.series||'')}" placeholder="Ej. 4x12"></div>
+    </div>
+    <div class="two-col">
+      <div class="field"><label>Descanso (opcional)</label><input class="ej-descanso" value="${escapeAttr(d.descanso||'')}" placeholder="Ej. 60 seg"></div>
+      <div class="field"><label>Link de referencia (opcional)</label><input class="ej-link" value="${escapeAttr(d.link||'')}" placeholder="https://youtube.com/..."></div>
+    </div>
+    <div class="field">
+      <label>Imagen ilustrativa — URL (opcional)</label>
+      <input class="ej-imagen" value="${escapeAttr(d.imagen||'')}" placeholder="https://..." oninput="previewImg(this)">
+      <div class="ej-preview">${d.imagen ? `<img src="${escapeAttr(d.imagen)}" onerror="this.style.display='none'">` : ''}</div>
+    </div>
+  `;
+  document.getElementById('ejerciciosForm').appendChild(div);
+}
+
+function previewImg(input){
+  const preview = input.closest('.field').querySelector('.ej-preview');
+  preview.innerHTML = input.value ? `<img src="${escapeAttr(input.value)}" onerror="this.style.display='none'">` : '';
+}
+
+function openRutinaModal(id){
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('libraryPanel').style.display = 'none';
+  document.getElementById('ejerciciosForm').innerHTML = '';
+  ejercicioCount = 0;
+  if(id){
+    const r = rutinas.find(x=>x.id===id);
+    document.getElementById('modalTitle').textContent = 'Editar rutina';
+    document.getElementById('editId').value = id;
+    document.getElementById('r-nombre').value = r.nombre;
+    document.getElementById('r-objetivo').value = r.objetivo;
+    (r.ejercicios||[]).forEach(ej=>addEjercicioRow(ej));
+    if((r.ejercicios||[]).length===0) addEjercicioRow();
+  } else {
+    document.getElementById('modalTitle').textContent = 'Nueva rutina';
+    document.getElementById('editId').value = '';
+    document.getElementById('r-nombre').value = '';
+    document.getElementById('r-objetivo').value = perfil.objetivo || 'ganar-musculo';
+    addEjercicioRow();
+  }
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('libraryPanel').style.display = 'none';
+}
+
+async function guardarRutina(){
+  const nombre = document.getElementById('r-nombre').value.trim();
+  if(!nombre){ showToast('Falta el nombre de la rutina'); return; }
+  const objetivo = document.getElementById('r-objetivo').value;
+  const ejercicios = Array.from(document.querySelectorAll('.ej-form-row')).map(row=>({
+    nombre: row.querySelector('.ej-nombre').value.trim(),
+    series: row.querySelector('.ej-series').value.trim(),
+    descanso: row.querySelector('.ej-descanso').value.trim(),
+    link: row.querySelector('.ej-link').value.trim(),
+    imagen: row.querySelector('.ej-imagen').value.trim()
+  })).filter(ej=>ej.nombre);
+
+  const editId = document.getElementById('editId').value;
+  const data = { nombre, objetivo, ejercicios };
+  try{
+    if(editId){
+      await rutinasCol().doc(editId).set(data, {merge:true});
+    } else {
+      await rutinasCol().add(data);
+    }
+    closeModal();
+    showToast('Rutina guardada');
+  }catch(e){ showToast('No se pudo guardar la rutina'); }
+}
+
+async function eliminarRutina(id){
+  if(!confirm('¿Eliminar esta rutina?')) return;
+  try{
+    await rutinasCol().doc(id).delete();
+    showToast('Rutina eliminada');
+  }catch(e){ showToast('No se pudo eliminar'); }
+}
+
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(()=>el.classList.remove('show'), 2200);
+}
+
+document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
+</script>
+</body>
+</html>
