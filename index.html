@@ -164,6 +164,28 @@
           <div class="chip-opt" data-v="avanzado">Avanzado</div>
         </div>
       </div>
+      <div class="field">
+        <label>¿Dónde entrenas?</label>
+        <div class="chip-group" id="p-modalidad">
+          <div class="chip-opt" data-v="gimnasio">Gimnasio</div>
+          <div class="chip-opt" data-v="casa">Casa</div>
+          <div class="chip-opt" data-v="hibrido">Híbrido (ambos)</div>
+        </div>
+      </div>
+      <div class="field" id="equipoField" style="display:none;">
+        <label>Equipo disponible en casa</label>
+        <div class="chip-group" id="p-equipo">
+          <div class="chip-opt" data-v="sin-equipo">Sin equipo (peso corporal)</div>
+          <div class="chip-opt" data-v="mancuernas">Mancuernas</div>
+          <div class="chip-opt" data-v="bandas">Bandas elásticas</div>
+          <div class="chip-opt" data-v="barra-discos">Barra y discos</div>
+          <div class="chip-opt" data-v="banco">Banco</div>
+          <div class="chip-opt" data-v="barra-dominadas">Barra de dominadas</div>
+          <div class="chip-opt" data-v="kettlebell">Kettlebell</div>
+          <div class="chip-opt" data-v="cuerda">Cuerda para saltar</div>
+          <div class="chip-opt" data-v="colchoneta">Colchoneta</div>
+        </div>
+      </div>
       <div class="two-col">
         <div class="field">
           <label>¿Fumas?</label>
@@ -252,6 +274,18 @@
         <textarea id="n-restricciones" placeholder="Ej. vegetariano, sin gluten, alergia a mariscos"></textarea>
       </div>
       <button class="btn primary" onclick="guardarNutricion()">Guardar perfil nutricional</button>
+    </div>
+
+    <div class="card">
+      <div class="rutina-top" style="margin-bottom:14px;">
+        <div class="rutina-title">Tu despensa</div>
+      </div>
+      <div class="two-col" style="align-items:flex-end;">
+        <div class="field" style="margin-bottom:0;"><label>Ingrediente</label><input id="d-nombre" placeholder="Ej. Pechuga de pollo"></div>
+        <div class="field" style="margin-bottom:0;"><label>Cantidad (opcional)</label><input id="d-cantidad" placeholder="Ej. 500g, 2 unidades"></div>
+      </div>
+      <button class="btn" style="margin-top:12px;" onclick="agregarDespensa()">+ Agregar a la despensa</button>
+      <div id="despensaList" style="margin-top:16px;"></div>
     </div>
   </div>
 </div>
@@ -418,6 +452,17 @@ document.querySelectorAll('#p-alcohol .chip-opt').forEach(c=>{
     c.classList.add('sel');
   });
 });
+document.querySelectorAll('#p-modalidad .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-modalidad .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+    const v = c.dataset.v;
+    document.getElementById('equipoField').style.display = (v==='casa' || v==='hibrido') ? 'block' : 'none';
+  });
+});
+document.querySelectorAll('#p-equipo .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{ c.classList.toggle('sel'); });
+});
 document.querySelectorAll('#n-objetivo .chip-opt').forEach(c=>{
   c.addEventListener('click', ()=>{
     document.querySelectorAll('#n-objetivo .chip-opt').forEach(x=>x.classList.remove('sel'));
@@ -439,6 +484,7 @@ async function loadNutricion(){
   document.querySelectorAll('#n-objetivo .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === nutricion.objetivo));
   const comidasSel = nutricion.comidas || [];
   document.querySelectorAll('#n-comidas .chip-opt').forEach(c=>c.classList.toggle('sel', comidasSel.includes(c.dataset.v)));
+  renderDespensa();
 }
 
 async function guardarNutricion(){
@@ -451,9 +497,55 @@ async function guardarNutricion(){
   };
   try{
     await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').set(data, {merge:true});
-    nutricion = data;
+    nutricion = Object.assign({}, nutricion, data);
     showToast('Perfil nutricional guardado');
   }catch(e){ showToast('No se pudo guardar el perfil nutricional'); }
+}
+
+function renderDespensa(){
+  const box = document.getElementById('despensaList');
+  const items = nutricion.despensa || [];
+  if(items.length === 0){
+    box.innerHTML = `<div class="ej-meta">Tu despensa está vacía — agrega lo que tengas en casa.</div>`;
+    return;
+  }
+  box.innerHTML = items.map((it, i) => `
+    <div class="ejercicio-row">
+      <div class="ej-info">
+        <div class="ej-name">${escapeHtml(it.nombre)}</div>
+        ${it.cantidad ? `<div class="ej-meta">${escapeHtml(it.cantidad)}</div>` : ''}
+      </div>
+      <span class="hist-del" title="Quitar de la despensa" onclick="quitarDespensa(${i})">✕</span>
+    </div>
+  `).join('');
+}
+
+async function agregarDespensa(){
+  const nombre = document.getElementById('d-nombre').value.trim();
+  const cantidad = document.getElementById('d-cantidad').value.trim();
+  if(!nombre){ showToast('Escribe el nombre del ingrediente'); return; }
+  const despensa = nutricion.despensa || [];
+  despensa.push({ nombre, cantidad });
+  try{
+    await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').set({ despensa }, {merge:true});
+    nutricion.despensa = despensa;
+    document.getElementById('d-nombre').value = '';
+    document.getElementById('d-cantidad').value = '';
+    renderDespensa();
+    showToast('Agregado a la despensa');
+  }catch(e){ showToast('No se pudo agregar el ingrediente'); }
+}
+
+async function quitarDespensa(index){
+  const despensa = nutricion.despensa || [];
+  despensa.splice(index, 1);
+  try{
+    await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').set({ despensa }, {merge:true});
+    nutricion.despensa = despensa;
+    renderDespensa();
+    showToast('Ingrediente eliminado');
+  }catch(e){ showToast('No se pudo eliminar'); }
+}
 }
 
 async function loadPerfil(){
@@ -475,6 +567,10 @@ async function loadPerfil(){
   document.querySelectorAll('#p-experiencia .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.experiencia));
   document.querySelectorAll('#p-fuma .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.fuma));
   document.querySelectorAll('#p-alcohol .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.alcohol));
+  document.querySelectorAll('#p-modalidad .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === perfil.modalidad));
+  const equipoSel = perfil.equipo || [];
+  document.querySelectorAll('#p-equipo .chip-opt').forEach(c=>c.classList.toggle('sel', equipoSel.includes(c.dataset.v)));
+  document.getElementById('equipoField').style.display = (perfil.modalidad==='casa' || perfil.modalidad==='hibrido') ? 'block' : 'none';
 }
 
 async function guardarPerfil(){
@@ -485,6 +581,8 @@ async function guardarPerfil(){
   const experienciaSel = document.querySelector('#p-experiencia .chip-opt.sel');
   const fumaSel = document.querySelector('#p-fuma .chip-opt.sel');
   const alcoholSel = document.querySelector('#p-alcohol .chip-opt.sel');
+  const modalidadSel = document.querySelector('#p-modalidad .chip-opt.sel');
+  const equipoSel = Array.from(document.querySelectorAll('#p-equipo .chip-opt.sel')).map(c=>c.dataset.v);
   const data = {
     nombre: document.getElementById('p-nombre').value.trim(),
     edad: Number(document.getElementById('p-edad').value)||null,
@@ -499,6 +597,8 @@ async function guardarPerfil(){
     experiencia: experienciaSel ? experienciaSel.dataset.v : '',
     fuma: fumaSel ? fumaSel.dataset.v : '',
     alcohol: alcoholSel ? alcoholSel.dataset.v : '',
+    modalidad: modalidadSel ? modalidadSel.dataset.v : '',
+    equipo: equipoSel,
     restricciones: document.getElementById('p-restricciones').value.trim()
   };
   try{
