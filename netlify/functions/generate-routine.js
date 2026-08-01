@@ -6,6 +6,8 @@ exports.handler = async function (event) {
   try {
     const perfil = JSON.parse(event.body || '{}');
 
+    const equipoTexto = (perfil.equipo && perfil.equipo.length) ? perfil.equipo.join(', ') : 'sin equipo (solo peso corporal)';
+
     const prompt = `Eres un entrenador personal experto. Genera un plan de entrenamiento semanal personalizado para esta persona:
 
 - Edad: ${perfil.edad || 'no especificada'}
@@ -18,6 +20,8 @@ exports.handler = async function (event) {
 - Consume alcohol: ${perfil.alcohol || 'no especificado'}
 - Objetivo principal: ${perfil.objetivo || 'salud general'}
 - Días de entrenamiento por semana: ${perfil.diasSemana || 3}
+- Dónde entrena: ${perfil.modalidad || 'gimnasio'}
+- Equipo disponible en casa: ${equipoTexto}
 - Lesiones, condiciones de salud o restricciones físicas: ${perfil.restricciones || 'ninguna'}
 
 Ajusta el plan según todos estos factores:
@@ -25,6 +29,9 @@ Ajusta el plan según todos estos factores:
 - Si fuma o consume alcohol con frecuencia, sé más conservador con el volumen de cardio de alta intensidad y progresa gradualmente.
 - Respeta estrictamente cualquier lesión o condición de salud indicada — evita ejercicios que la agraven y sugiere alternativas seguras.
 - Ajusta el énfasis según el sexo indicado: si es "mujer", dale más volumen (más ejercicios y series) a piernas y glúteos; si es "hombre", dale más volumen a pecho, espalda y brazos; si no se especificó, reparte el volumen de forma equilibrada entre todos los grupos musculares.
+- Si "dónde entrena" es "gimnasio", asume acceso a equipo completo de gimnasio (pesas libres, máquinas, barras) en todos los días.
+- Si es "casa", usa ÚNICAMENTE el equipo disponible en casa que se listó arriba (si dice "sin equipo", usa solo ejercicios de peso corporal) en todos los días.
+- Si es "híbrido", combina días de gimnasio (con equipo completo) y días de casa (usando solo el equipo de casa listado) de forma realista y equilibrada — evita agrupar todos los días de un mismo lugar seguidos uno tras otro. En el "nombre" de cada día, indica claramente si es "(Gimnasio)" o "(Casa)" al final, por ejemplo: "Día 1 — Empuje (Gimnasio)" o "Día 2 — Piernas (Casa)".
 
 Devuelve ÚNICAMENTE un array JSON válido (sin texto antes ni después, sin markdown), con esta forma exacta:
 [
@@ -36,7 +43,7 @@ Devuelve ÚNICAMENTE un array JSON válido (sin texto antes ni después, sin mar
   }
 ]
 
-El array debe tener exactamente ${perfil.diasSemana || 3} elementos (uno por día). Cada día debe tener entre 4 y 8 ejercicios, apropiados para el objetivo, el sexo, la experiencia y las restricciones indicadas. No repitas el mismo grupo muscular en días consecutivos si hay más de 2 días. Responde solo con el JSON.`;
+El array debe tener exactamente ${perfil.diasSemana || 3} elementos (uno por día). Cada día debe tener entre 4 y 8 ejercicios, apropiados para el objetivo, el sexo, la experiencia, el lugar de entrenamiento, el equipo disponible y las restricciones indicadas. No repitas el mismo grupo muscular en días consecutivos si hay más de 2 días. Responde solo con el JSON.`;
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
