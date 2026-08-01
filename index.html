@@ -543,7 +543,7 @@ async function generarConIA(){
       await rutinasCol().add({
         nombre: dia.nombre || `Día ${i+1}`,
         objetivo: perfil.objetivo,
-        notaPerfil: 'Generado por IA según tu perfil completo',
+        notaPerfil: `Generado por IA — Rutina para ${perfil.sexo === 'mujer' ? 'Mujer' : perfil.sexo === 'hombre' ? 'Hombre' : 'perfil general'}, objetivo: ${objetivoLabels[perfil.objetivo] || perfil.objetivo}`,
         diaPlan: i+1,
         ejercicios
       });
