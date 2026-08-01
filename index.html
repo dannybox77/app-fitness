@@ -195,7 +195,6 @@
 
   <div id="viewRutinas" style="display:none;">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn" onclick="generarPlanSemanal()">🗓️ Generar plan semanal</button>
       <button class="btn" onclick="generarConIA()">🤖 Generar con IA (personalizado)</button>
       <button class="btn primary" onclick="openRutinaModal()">+ Nueva rutina</button>
     </div>
@@ -419,82 +418,6 @@ const gruposEjercicios = {
   pantorrillas: ['Elevación de talones de pie', 'Elevación de talones sentado', 'Saltos de cuerda']
 };
 
-function splitSemanal(dias){
-  const push = ['pecho','triceps'];
-  const pull = ['espalda','biceps'];
-  const inferior = ['cuadriceps','femorales','gluteos','pantorrillas'];
-  const pushDia = {nombre:'Empuje (pecho y tríceps)', grupos:push};
-  const pullDia = {nombre:'Jalón (espalda y bíceps)', grupos:pull};
-  const piernasDia = {nombre:'Piernas y glúteos', grupos:inferior};
-  switch(Number(dias)){
-    case 1:
-      return [{nombre:'Cuerpo completo', grupos:[...push, ...pull, 'antebrazo', ...inferior]}];
-    case 2:
-      return [{nombre:'Tren superior (pecho, espalda, brazos)', grupos:[...push, ...pull, 'antebrazo']}, piernasDia];
-    case 3:
-      return [pushDia, pullDia, piernasDia];
-    case 4:
-      return [pushDia, pullDia, piernasDia, {nombre:'Brazos y antebrazo', grupos:['biceps','triceps','antebrazo']}];
-    case 5:
-      return [pushDia, pullDia, piernasDia, pushDia, pullDia];
-    case 6:
-      return [pushDia, pullDia, piernasDia, pushDia, pullDia, piernasDia];
-    default:
-      return [pushDia, pullDia, piernasDia];
-  }
-}
-
-async function generarPlanSemanal(){
-  if(!perfil.objetivo){
-    showToast('Primero define tu objetivo en la pestaña Perfil');
-    switchTab('perfil');
-    return;
-  }
-  if(!perfil.diasSemana){
-    showToast('Primero indica cuántos días entrenas por semana en tu Perfil');
-    switchTab('perfil');
-    return;
-  }
-  const plan = splitSemanal(perfil.diasSemana);
-  const anteriores = rutinas.filter(r=>r.diaPlan);
-  const aviso = anteriores.length
-    ? `Esto va a borrar tus ${anteriores.length} rutina(s) de plan semanal anteriores y crear ${plan.length} nueva(s). ¿Continuar?`
-    : `Esto va a crear ${plan.length} rutina(s) nueva(s), una por cada día de tu semana. ¿Continuar?`;
-  if(!confirm(aviso)) return;
-
-  const series = seriesParaObjetivo(perfil.objetivo);
-  try{
-    for(const r of anteriores){
-      await rutinasCol().doc(r.id).delete();
-    }
-    for(let i=0; i<plan.length; i++){
-      const diaInfo = plan[i];
-      let cantidad = diaInfo.grupos.length <= 2 ? 3 : diaInfo.grupos.length <= 4 ? 2 : 1;
-      // pequeño ajuste de énfasis según el perfil, siempre editable después
-      const esDiaPiernas = diaInfo.nombre.includes('Piernas');
-      const esDiaEmpuje = diaInfo.nombre.includes('Empuje');
-      let nota = '';
-      if(perfil.sexo === 'mujer' && esDiaPiernas){ cantidad += 1; nota = 'Ajustada para: Mujer — énfasis extra en piernas y glúteos'; }
-      if(perfil.sexo === 'hombre' && esDiaEmpuje){ cantidad += 1; nota = 'Ajustada para: Hombre — énfasis extra en pecho y tríceps'; }
-      const ejercicios = [];
-      diaInfo.grupos.forEach(g=>{
-        const iconUri = grupoIconDataUri(g);
-        gruposEjercicios[g].slice(0, cantidad).forEach(nombre=>{
-          ejercicios.push({ nombre, series, descanso:'', link: ytSearchLink(nombre), imagen: iconUri });
-        });
-      });
-      await rutinasCol().add({
-        nombre: `Día ${i+1} — ${diaInfo.nombre}`,
-        objetivo: perfil.objetivo,
-        notaPerfil: nota,
-        diaPlan: i+1,
-        ejercicios
-      });
-    }
-    showToast('Plan semanal generado');
-  }catch(e){ showToast('No se pudo generar el plan completo'); }
-}
-
 async function generarConIA(){
   if(!perfil.objetivo){
     showToast('Primero define tu objetivo en la pestaña Perfil');
@@ -506,6 +429,19 @@ async function generarConIA(){
     switchTab('perfil');
     return;
   }
+
+  if(perfil.ultimaGeneracionIA){
+    const ultima = new Date(perfil.ultimaGeneracionIA);
+    const disponible = new Date(ultima);
+    disponible.setMonth(disponible.getMonth() + 3);
+    const hoy = new Date();
+    if(hoy < disponible){
+      const fechaTexto = disponible.toLocaleDateString('es-CR', { day:'2-digit', month:'2-digit', year:'numeric' });
+      alert(`Ya generaste una rutina con IA — se recomienda respetarla al menos 3 meses antes de cambiarla.\n\nPodrás generar una nueva a partir del ${fechaTexto}.`);
+      return;
+    }
+  }
+
   const anteriores = rutinas.filter(r=>r.diaPlan);
   const aviso = anteriores.length
     ? `La IA va a generar un plan nuevo y personalizado, reemplazando tus ${anteriores.length} rutina(s) de plan semanal actuales. ¿Continuar?`
@@ -548,6 +484,9 @@ async function generarConIA(){
         ejercicios
       });
     }
+    const ahora = new Date().toISOString();
+    await db.collection('users').doc(currentUser.uid).collection('perfil').doc('data').set({ ultimaGeneracionIA: ahora }, {merge:true});
+    perfil.ultimaGeneracionIA = ahora;
     showToast('Plan generado por IA');
   }catch(e){
     showToast('No se pudo interpretar la respuesta de la IA, intenta de nuevo');
