@@ -221,7 +221,7 @@
 
   <div id="viewRutinas" style="display:none;">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-      <button class="btn" onclick="generarConIA()">🤖 Generar con IA (personalizado)</button>
+      <button class="btn" onclick="generarConIA()">🧠 Plan de entrenamiento a la medida</button>
       <button class="btn primary" onclick="openRutinaModal()">+ Nueva rutina</button>
     </div>
     <div id="list"></div>
@@ -565,11 +565,11 @@ async function generarConIA(){
 
   const anteriores = rutinas.filter(r=>r.diaPlan);
   const aviso = anteriores.length
-    ? `La IA va a generar un plan nuevo y personalizado, reemplazando tus ${anteriores.length} rutina(s) de plan semanal actuales. ¿Continuar?`
-    : `La IA va a generar un plan de ${perfil.diasSemana} día(s) personalizado según tu perfil. ¿Continuar?`;
+    ? `Se va a generar un plan nuevo a la medida, reemplazando tus ${anteriores.length} rutina(s) de plan semanal actuales. ¿Continuar?`
+    : `Se va a generar un plan de ${perfil.diasSemana} día(s) a la medida según tu perfil completo. ¿Continuar?`;
   if(!confirm(aviso)) return;
 
-  showToast('Generando con IA... esto puede tardar unos segundos');
+  showToast('Preparando tu plan a la medida... esto puede tardar unos segundos');
   try{
     const resp = await fetch('/.netlify/functions/generate-routine', {
       method: 'POST',
@@ -600,7 +600,7 @@ async function generarConIA(){
       await rutinasCol().add({
         nombre: dia.nombre || `Día ${i+1}`,
         objetivo: perfil.objetivo,
-        notaPerfil: `Generado por IA — Rutina para ${perfil.sexo === 'mujer' ? 'Mujer' : perfil.sexo === 'hombre' ? 'Hombre' : 'perfil general'}, objetivo: ${objetivoLabels[perfil.objetivo] || perfil.objetivo}`,
+        notaPerfil: `Plan a la medida — para ${perfil.sexo === 'mujer' ? 'Mujer' : perfil.sexo === 'hombre' ? 'Hombre' : 'perfil general'}, objetivo: ${objetivoLabels[perfil.objetivo] || perfil.objetivo}`,
         diaPlan: i+1,
         ejercicios
       });
@@ -608,7 +608,7 @@ async function generarConIA(){
     const ahora = new Date().toISOString();
     await db.collection('users').doc(currentUser.uid).collection('perfil').doc('data').set({ ultimaGeneracionIA: ahora }, {merge:true});
     perfil.ultimaGeneracionIA = ahora;
-    showToast('Plan generado por IA');
+    showToast('Plan a la medida generado');
   }catch(e){
     showToast('No se pudo interpretar la respuesta de la IA, intenta de nuevo');
   }
