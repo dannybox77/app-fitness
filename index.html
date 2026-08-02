@@ -293,6 +293,14 @@
       <button class="btn" style="margin-top:12px;" onclick="agregarDespensa()">+ Agregar a la despensa</button>
       <div id="despensaList" style="margin-top:16px;"></div>
     </div>
+
+    <div class="card">
+      <div class="rutina-top" style="margin-bottom:14px;">
+        <div class="rutina-title">Recetas sugeridas</div>
+      </div>
+      <button class="btn primary" onclick="generarRecetas()">🍳 Generar recetas con tu despensa</button>
+      <div id="recetasList" style="margin-top:16px;"></div>
+    </div>
   </div>
 
   <div id="viewAdmin" style="display:none;">
@@ -546,6 +554,7 @@ async function loadNutricion(){
   const comidasSel = nutricion.comidas || [];
   document.querySelectorAll('#n-comidas .chip-opt').forEach(c=>c.classList.toggle('sel', comidasSel.includes(c.dataset.v)));
   renderDespensa();
+  renderRecetas();
 }
 
 async function guardarNutricion(){
@@ -606,6 +615,81 @@ async function quitarDespensa(index){
     renderDespensa();
     showToast('Ingrediente eliminado');
   }catch(e){ showToast('No se pudo eliminar'); }
+}
+
+function renderRecetas(){
+  const box = document.getElementById('recetasList');
+  const recetas = nutricion.recetas || [];
+  if(recetas.length === 0){
+    box.innerHTML = `<div class="ej-meta">Aún no has generado recetas — dale clic al botón de arriba.</div>`;
+    return;
+  }
+  box.innerHTML = recetas.map((r, i) => `
+    <div class="rutina-card" style="margin-top:12px;">
+      <div class="rutina-top">
+        <div class="rutina-title">${escapeHtml(r.nombre || 'Receta')}</div>
+        <span class="badge">${escapeHtml(r.tiempo || '')}</span>
+      </div>
+      ${r.macros ? `<div class="ej-meta" style="margin-bottom:8px;">Proteína: ${escapeHtml(r.macros.proteina||'—')} · Carbos: ${escapeHtml(r.macros.carbos||'—')} · Grasas: ${escapeHtml(r.macros.grasas||'—')}</div>` : ''}
+      ${(r.ingredientesUsados && r.ingredientesUsados.length) ? `<div class="ej-meta" style="color:var(--green);"><b>Usa de tu despensa:</b> ${r.ingredientesUsados.map(x=>escapeHtml(x)).join(', ')}</div>` : ''}
+      ${(r.ingredientesFaltantes && r.ingredientesFaltantes.length) ? `<div class="ej-meta" style="color:var(--amber);"><b>Te falta:</b> ${r.ingredientesFaltantes.map(x=>escapeHtml(x)).join(', ')}</div>` : ''}
+      ${(r.pasos && r.pasos.length) ? `<div class="ej-meta" style="margin-top:8px;"><b>Pasos:</b><br>${r.pasos.map((p,idx)=>`${idx+1}. ${escapeHtml(p)}`).join('<br>')}</div>` : ''}
+      <div class="rutina-actions">
+        <a onclick="marcarCocinada(${i})">✓ Marcar como cocinada</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function generarRecetas(){
+  const despensa = nutricion.despensa || [];
+  if(despensa.length === 0){
+    showToast('Agrega ingredientes a tu despensa primero');
+    return;
+  }
+  showToast('Generando recetas a la medida... esto puede tardar unos segundos');
+  try{
+    const resp = await fetch('/.netlify/functions/generate-recipes', {
+      method: 'POST',
+      headers: {'content-type':'application/json'},
+      body: JSON.stringify({ nutricion, despensa, objetivoFitness: perfil.objetivo || '' })
+    });
+    const data = await resp.json();
+    if(!resp.ok){
+      showToast('Error al generar recetas: ' + (data.error ? JSON.stringify(data.error).slice(0,120) : 'desconocido'));
+      return;
+    }
+    let texto = (data.texto || '').trim();
+    const inicio = texto.indexOf('[');
+    const fin = texto.lastIndexOf(']');
+    if(inicio !== -1 && fin !== -1) texto = texto.slice(inicio, fin+1);
+    const recetas = JSON.parse(texto);
+
+    await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').set({ recetas }, {merge:true});
+    nutricion.recetas = recetas;
+    renderRecetas();
+    showToast('Recetas generadas');
+  }catch(e){
+    showToast('No se pudo interpretar la respuesta, intenta de nuevo');
+  }
+}
+
+async function marcarCocinada(index){
+  const recetas = nutricion.recetas || [];
+  const receta = recetas[index];
+  if(!receta) return;
+  let despensa = nutricion.despensa || [];
+  const usados = (receta.ingredientesUsados || []).map(x=>x.toLowerCase());
+  despensa = despensa.filter(it => !usados.some(u => it.nombre.toLowerCase().includes(u) || u.includes(it.nombre.toLowerCase())));
+  recetas.splice(index, 1);
+  try{
+    await db.collection('users').doc(currentUser.uid).collection('nutricion').doc('data').set({ despensa, recetas }, {merge:true});
+    nutricion.despensa = despensa;
+    nutricion.recetas = recetas;
+    renderDespensa();
+    renderRecetas();
+    showToast('¡Buen provecho! Despensa actualizada');
+  }catch(e){ showToast('No se pudo actualizar la despensa'); }
 }
 
 async function loadPerfil(){
