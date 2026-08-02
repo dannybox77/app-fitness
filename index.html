@@ -114,9 +114,14 @@
       <input type="password" id="login-pass" placeholder="Mínimo 6 caracteres">
     </div>
     <button class="btn primary" style="width:100%;justify-content:center;" id="loginBtn" onclick="handleAuth()">Iniciar sesión</button>
-    <div class="login-toggle" id="loginToggleWrap">
-      ¿No tienes cuenta? <a onclick="toggleAuthMode()">Crear una</a>
-    </div>
+  </div>
+</div>
+
+<div id="pendingScreen" style="display:none;min-height:100vh;align-items:center;justify-content:center;background:var(--paper);">
+  <div class="login-card" style="text-align:center;">
+    <h1>Acceso pendiente</h1>
+    <div class="sub">Tu cuenta fue creada, pero todavía necesita aprobación del administrador antes de poder usar la app. Te avisarán en cuanto esté lista.</div>
+    <button class="btn" style="width:100%;justify-content:center;" onclick="cerrarSesion()">Salir</button>
   </div>
 </div>
 
@@ -137,6 +142,7 @@
     <div class="tab active" id="tabPerfilBtn" onclick="switchTab('perfil')">Perfil</div>
     <div class="tab" id="tabRutinasBtn" onclick="switchTab('rutinas')">Rutinas</div>
     <div class="tab" id="tabNutricionBtn" onclick="switchTab('nutricion')">Nutrición</div>
+    <div class="tab" id="tabAdminBtn" style="display:none;" onclick="switchTab('admin')">Admin</div>
   </div>
 
   <div id="viewPerfil">
@@ -288,6 +294,16 @@
       <div id="despensaList" style="margin-top:16px;"></div>
     </div>
   </div>
+
+  <div id="viewAdmin" style="display:none;">
+    <div class="card">
+      <div class="rutina-top" style="margin-bottom:14px;">
+        <div class="rutina-title">Solicitudes pendientes de aprobación</div>
+      </div>
+      <button class="btn" onclick="cargarPendientes()">🔄 Actualizar lista</button>
+      <div id="pendientesList" style="margin-top:16px;"></div>
+    </div>
+  </div>
 </div>
 </div>
 
@@ -339,21 +355,11 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 let currentUser = null;
-let authMode = 'login';
 let perfil = {};
 let rutinas = [];
 let unsubRutinas = null;
 let ejercicioCount = 0;
 
-function toggleAuthMode(){
-  authMode = authMode === 'login' ? 'signup' : 'login';
-  document.getElementById('loginTitle').textContent = authMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta';
-  document.getElementById('loginBtn').textContent = authMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta';
-  document.getElementById('loginToggleWrap').innerHTML = authMode === 'login'
-    ? '¿No tienes cuenta? <a onclick="toggleAuthMode()">Crear una</a>'
-    : '¿Ya tienes cuenta? <a onclick="toggleAuthMode()">Inicia sesión</a>';
-  document.getElementById('loginErr').style.display = 'none';
-}
 function showLoginError(msg){
   const el = document.getElementById('loginErr');
   el.textContent = msg;
@@ -364,31 +370,52 @@ async function handleAuth(){
   const pass = document.getElementById('login-pass').value;
   if(!email || !pass){ showLoginError('Completa correo y contraseña.'); return; }
   try{
-    if(authMode === 'login'){
-      await auth.signInWithEmailAndPassword(email, pass);
-    } else {
-      await auth.createUserWithEmailAndPassword(email, pass);
-    }
+    await auth.signInWithEmailAndPassword(email, pass);
   }catch(e){
     const map = {
       'auth/invalid-email':'El correo no es válido.',
-      'auth/user-not-found':'No existe una cuenta con ese correo.',
+      'auth/user-not-found':'No existe una cuenta con ese correo. Pídele acceso al administrador.',
       'auth/wrong-password':'Contraseña incorrecta.',
-      'auth/email-already-in-use':'Ya existe una cuenta con ese correo.',
-      'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
-      'auth/invalid-credential':'Correo o contraseña incorrectos.'
+      'auth/invalid-credential':'Correo o contraseña incorrectos. Si no tienes cuenta, pídele acceso al administrador.'
     };
     showLoginError(map[e.code] || 'Ocurrió un error, intenta de nuevo.');
   }
 }
 function cerrarSesion(){ auth.signOut(); }
 
-auth.onAuthStateChanged(user=>{
+const ADMIN_EMAIL = 'residentdb77@gmail.com';
+
+auth.onAuthStateChanged(async user=>{
   if(user){
     currentUser = user;
     document.getElementById('loginScreen').style.display = 'none';
+
+    const esAdmin = user.email === ADMIN_EMAIL;
+    const perfilRef = db.collection('users').doc(user.uid).collection('perfil').doc('data');
+    let perfilDoc;
+    try{ perfilDoc = await perfilRef.get(); }catch(e){ perfilDoc = null; }
+
+    if(!perfilDoc || !perfilDoc.exists){
+      try{ await perfilRef.set({ aprobado: esAdmin, correo: user.email }, {merge:true}); }catch(e){}
+      perfil = { aprobado: esAdmin, correo: user.email };
+    } else {
+      perfil = perfilDoc.data();
+      if(perfil.aprobado === undefined){
+        try{ await perfilRef.set({ aprobado: true, correo: perfil.correo || user.email }, {merge:true}); }catch(e){}
+        perfil.aprobado = true;
+      }
+    }
+
+    if(!perfil.aprobado && !esAdmin){
+      document.getElementById('pendingScreen').style.display = 'flex';
+      document.getElementById('appScreen').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('pendingScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'block';
     document.getElementById('userBadge').textContent = user.email;
+    document.getElementById('tabAdminBtn').style.display = esAdmin ? 'block' : 'none';
     loadPerfil();
     loadNutricion();
     subscribeRutinas();
@@ -397,17 +424,51 @@ auth.onAuthStateChanged(user=>{
     if(unsubRutinas){ unsubRutinas(); unsubRutinas = null; }
     perfil = {}; rutinas = [];
     document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('pendingScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'none';
   }
 });
+
+async function cargarPendientes(){
+  const box = document.getElementById('pendientesList');
+  box.innerHTML = 'Cargando...';
+  try{
+    const snap = await db.collectionGroup('perfil').where('aprobado','==', false).get();
+    if(snap.empty){ box.innerHTML = '<div class="ej-meta">No hay solicitudes pendientes.</div>'; return; }
+    box.innerHTML = snap.docs.map(d=>{
+      const data = d.data();
+      const uid = d.ref.parent.parent.id;
+      return `<div class="ejercicio-row">
+        <div class="ej-info">
+          <div class="ej-name">${escapeHtml(data.nombre || data.correo || 'Sin nombre')}</div>
+          ${data.correo ? `<div class="ej-meta">${escapeHtml(data.correo)}</div>` : ''}
+        </div>
+        <button class="btn primary" style="font-size:12px;" onclick="aprobarUsuario('${uid}')">✓ Aprobar</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    box.innerHTML = `<div class="ej-meta">Error al cargar: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function aprobarUsuario(uid){
+  try{
+    await db.collection('users').doc(uid).collection('perfil').doc('data').set({ aprobado: true }, {merge:true});
+    showToast('Usuario aprobado');
+    cargarPendientes();
+  }catch(e){ showToast('No se pudo aprobar'); }
+}
 
 function switchTab(tab){
   document.getElementById('tabPerfilBtn').classList.toggle('active', tab==='perfil');
   document.getElementById('tabRutinasBtn').classList.toggle('active', tab==='rutinas');
   document.getElementById('tabNutricionBtn').classList.toggle('active', tab==='nutricion');
+  document.getElementById('tabAdminBtn').classList.toggle('active', tab==='admin');
   document.getElementById('viewPerfil').style.display = tab==='perfil' ? 'block' : 'none';
   document.getElementById('viewRutinas').style.display = tab==='rutinas' ? 'block' : 'none';
   document.getElementById('viewNutricion').style.display = tab==='nutricion' ? 'block' : 'none';
+  document.getElementById('viewAdmin').style.display = tab==='admin' ? 'block' : 'none';
+  if(tab==='admin') cargarPendientes();
 }
 
 document.querySelectorAll('#p-actividad .chip-opt').forEach(c=>{
