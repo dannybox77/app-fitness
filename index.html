@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   :root{
     --ink:#f2ece0; --ink-soft:#a89f8f; --paper:#0b0b0b; --card:#171512; --line:#332e26;
@@ -250,6 +251,18 @@
   </div>
 
   <div id="viewRutinas" style="display:none;">
+    <div id="checkinBanner" class="card" style="display:none;border-color:var(--teal);">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+        <div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px;" id="checkinTitulo">Día 1 de 5</div>
+          <div class="ej-meta">¿Entrenaste hoy?</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn primary" onclick="marcarCheckin(true)">✅ Sí, lo hice</button>
+          <button class="btn" onclick="marcarCheckin(false)">❌ No pude</button>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
       <button class="btn" onclick="generarConIA()">🧠 Generar plan de entrenamiento a la medida</button>
       <button class="btn primary" onclick="openRutinaModal()">+ Nueva rutina</button>
@@ -324,12 +337,44 @@
       <div id="pendientesList" style="margin-top:16px;"></div>
     </div>
   </div>
+  <div id="viewProgreso" style="display:none;">
+    <div class="three-col">
+      <div class="card" style="text-align:center;">
+        <div class="ej-meta">Racha actual</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;color:var(--teal);" id="prog-racha">0 🔥</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="ej-meta">Ciclos completados</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;" id="prog-ciclos">0</div>
+      </div>
+      <div class="card" style="text-align:center;">
+        <div class="ej-meta">Cumplimiento general</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;" id="prog-cumplimiento">0%</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="rutina-title" style="margin-bottom:10px;">Ciclo actual</div>
+      <div id="prog-barraDias" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+
+    <div class="card">
+      <div class="rutina-title" style="margin-bottom:10px;">Evolución por ciclo</div>
+      <canvas id="prog-chart" height="120"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="rutina-title" style="margin-bottom:10px;">Historial de ciclos</div>
+      <div id="prog-historial"></div>
+    </div>
+  </div>
 </div>
 
 <div class="bottom-nav">
   <div class="nav-item active" id="tabPerfilBtn" onclick="switchTab('perfil')"><span class="nav-ic">🏋️</span>Perfil</div>
   <div class="nav-item" id="tabRutinasBtn" onclick="switchTab('rutinas')"><span class="nav-ic">📋</span>Rutinas</div>
   <div class="nav-item" id="tabNutricionBtn" onclick="switchTab('nutricion')"><span class="nav-ic">🍽️</span>Nutrición</div>
+  <div class="nav-item" id="tabProgresoBtn" onclick="switchTab('progreso')"><span class="nav-ic">📈</span>Progreso</div>
   <div class="nav-item" id="tabAdminBtn" style="display:none;" onclick="switchTab('admin')"><span class="nav-ic">⚙️</span>Admin</div>
 </div>
 </div>
@@ -463,6 +508,7 @@ auth.onAuthStateChanged(async user=>{
     loadPerfil();
     loadNutricion();
     subscribeRutinas();
+    loadProgreso();
   } else {
     currentUser = null;
     if(unsubRutinas){ unsubRutinas(); unsubRutinas = null; }
@@ -507,12 +553,15 @@ function switchTab(tab){
   document.getElementById('tabPerfilBtn').classList.toggle('active', tab==='perfil');
   document.getElementById('tabRutinasBtn').classList.toggle('active', tab==='rutinas');
   document.getElementById('tabNutricionBtn').classList.toggle('active', tab==='nutricion');
+  document.getElementById('tabProgresoBtn').classList.toggle('active', tab==='progreso');
   document.getElementById('tabAdminBtn').classList.toggle('active', tab==='admin');
   document.getElementById('viewPerfil').style.display = tab==='perfil' ? 'block' : 'none';
   document.getElementById('viewRutinas').style.display = tab==='rutinas' ? 'block' : 'none';
   document.getElementById('viewNutricion').style.display = tab==='nutricion' ? 'block' : 'none';
+  document.getElementById('viewProgreso').style.display = tab==='progreso' ? 'block' : 'none';
   document.getElementById('viewAdmin').style.display = tab==='admin' ? 'block' : 'none';
   if(tab==='admin') cargarPendientes();
+  if(tab==='progreso') renderProgreso();
 }
 
 document.querySelectorAll('#p-actividad .chip-opt').forEach(c=>{
@@ -845,6 +894,165 @@ function subscribeRutinas(){
     rutinas = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     renderRutinas();
   }, err=>{ showToast('No se pudo sincronizar: '+err.message); });
+  }
+  
+  function progresoRef(){ return db.collection('users').doc(currentUser.uid).collection('progreso').doc('data'); }
+
+let progreso = { diaActual: 1, historial: [] };
+
+async function loadProgreso(){
+  try{
+    const doc = await progresoRef().get();
+    progreso = doc.exists ? doc.data() : { diaActual: 1, historial: [] };
+  }catch(e){ progreso = { diaActual: 1, historial: [] }; }
+  actualizarCheckinBanner();
+}
+
+function actualizarCheckinBanner(){
+  const banner = document.getElementById('checkinBanner');
+  const totalDias = perfil.diasSemana || 0;
+  if(!totalDias){
+    banner.style.display = 'none';
+    return;
+  }
+  const dia = progreso.diaActual || 1;
+  document.getElementById('checkinTitulo').textContent = `Día ${dia} de ${totalDias}`;
+  banner.style.display = 'flex' === banner.style.display ? 'flex' : 'block';
+  banner.style.display = 'block';
+}
+
+async function marcarCheckin(completado){
+  const totalDias = perfil.diasSemana || 0;
+  if(!totalDias){ showToast('Primero define tus días de entrenamiento en Perfil'); return; }
+
+  const dia = progreso.diaActual || 1;
+  const historialCiclo = progreso.cicloEnCurso || [];
+  historialCiclo.push({ dia, completado, fecha: new Date().toISOString() });
+
+  if(dia >= totalDias){
+    const completados = historialCiclo.filter(d=>d.completado).length;
+    const ciclo = {
+      inicio: historialCiclo[0] ? historialCiclo[0].fecha : new Date().toISOString(),
+      fin: new Date().toISOString(),
+      totalDias,
+      completados,
+      porcentaje: Math.round((completados/totalDias)*100)
+    };
+    const historial = progreso.historial || [];
+    historial.push(ciclo);
+    progreso = { diaActual: 1, historial, cicloEnCurso: [] };
+    showToast('¡Ciclo completado! Empiezas de nuevo en el Día 1');
+  } else {
+    progreso = { diaActual: dia+1, historial: progreso.historial || [], cicloEnCurso: historialCiclo };
+    showToast(completado ? '¡Bien hecho!' : 'Registrado, sigue adelante');
+  }
+
+  try{
+    await progresoRef().set(progreso, {merge:false});
+  }catch(e){ showToast('No se pudo guardar tu progreso'); }
+
+  actualizarCheckinBanner();
+  renderProgreso();
+}
+
+function calcularRacha(historial){
+  let racha = 0;
+  for(let i=historial.length-1; i>=0; i--){
+    if(historial[i].porcentaje === 100) racha++;
+    else break;
+  }
+  return racha;
+}
+
+function renderProgreso(){
+  const historial = progreso.historial || [];
+  const racha = calcularRacha(historial);
+  document.getElementById('prog-racha').textContent = racha + ' 🔥';
+  document.getElementById('prog-ciclos').textContent = historial.length;
+
+  const totalPorcentaje = historial.length ? Math.round(historial.reduce((s,c)=>s+c.porcentaje,0)/historial.length) : 0;
+  document.getElementById('prog-cumplimiento').textContent = totalPorcentaje + '%';
+
+  const totalDias = perfil.diasSemana || 0;
+  const dia = progreso.diaActual || 1;
+  const cicloEnCurso = progreso.cicloEnCurso || [];
+  const barra = document.getElementById('prog-barraDias');
+  barra.innerHTML = '';
+  for(let i=1; i<=totalDias; i++){
+    const registro = cicloEnCurso.find(d=>d.dia===i);
+    const span = document.createElement('div');
+    span.style.cssText = 'width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:1px solid var(--line);';
+    if(registro){
+      span.style.background = registro.completado ? 'var(--green)' : 'var(--red)';
+      span.style.color = '#0b0b0b';
+      span.textContent = registro.completado ? '✓' : '✕';
+    } else if(i===dia){
+      span.style.borderColor = 'var(--teal)';
+      span.style.color = 'var(--teal)';
+      span.textContent = i;
+    } else {
+      span.style.color = 'var(--ink-soft)';
+      span.textContent = i;
+    }
+    barra.appendChild(span);
+  }
+
+  const histBox = document.getElementById('prog-historial');
+  if(historial.length === 0){
+    histBox.innerHTML = '<div class="ej-meta">Aún no has completado ningún ciclo.</div>';
+  } else {
+    histBox.innerHTML = historial.slice().reverse().map(c=>{
+      const fechaInicio = new Date(c.inicio).toLocaleDateString('es-CR');
+      const fechaFin = new Date(c.fin).toLocaleDateString('es-CR');
+      return `<div class="ejercicio-row">
+        <div class="ej-info">
+          <div class="ej-name">${fechaInicio} → ${fechaFin}</div>
+          <div class="ej-meta">${c.completados}/${c.totalDias} días completados</div>
+        </div>
+        <span class="badge">${c.porcentaje}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  dibujarGraficaProgreso(historial);
+}
+  let progresoChart = null;
+
+function dibujarGraficaProgreso(historial){
+  const canvas = document.getElementById('prog-chart');
+  if(!canvas || typeof Chart === 'undefined') return;
+
+  const labels = historial.map((c,i)=>'Ciclo '+(i+1));
+  const datos = historial.map(c=>c.porcentaje);
+
+  if(progresoChart){ progresoChart.destroy(); }
+
+  progresoChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '% Cumplimiento',
+        data: datos,
+        borderColor: '#d4a72c',
+        backgroundColor: 'rgba(212,167,44,0.15)',
+        borderWidth: 2,
+        tension: 0.35,
+        fill: true,
+        pointBackgroundColor: '#d4a72c',
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 0, max: 100, ticks: { color: '#a89f8f', callback: v=>v+'%' }, grid: { color: '#332e26' } },
+        x: { ticks: { color: '#a89f8f' }, grid: { color: '#332e26' } }
+      }
+    }
+  });
+}
 }
 
 const objetivoLabels = {
