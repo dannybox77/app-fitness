@@ -4,38 +4,34 @@ exports.handler = async function (event) {
   }
 
   try {
-    const body = JSON.parse(event.body || '{}');
-    const nutricion = body.nutricion || {};
-    const despensa = body.despensa || [];
-    const objetivoFitness = body.objetivoFitness || '';
+    const perfil = JSON.parse(event.body || '{}');
 
-    const despensaTexto = despensa.length
-      ? despensa.map(it => `${it.nombre} (${it.cantidad != null ? it.cantidad : '?'} ${it.unidad || ''})`).join(', ')
-      : 'despensa vacía';
+    const restricciones = perfil.restricciones || 'ninguna';
+    const equipoTexto = (perfil.equipo && perfil.equipo.length) ? perfil.equipo.join(', ') : 'sin equipo especificado';
 
-    const comidasTexto = (nutricion.comidas && nutricion.comidas.length) ? nutricion.comidas.join(', ') : 'no especificadas';
+    const prompt = `Eres un entrenador personal experto. Diseña un plan de entrenamiento semanal a la medida según este perfil:
 
-    const prompt = `Eres un nutricionista experto. Sugiere recetas usando principalmente lo que la persona ya tiene en su despensa.
+- Sexo: ${perfil.sexo || 'no especificado'}
+- Edad: ${perfil.edad || 'no especificada'}
+- Peso: ${perfil.peso || 'no especificado'} kg
+- Altura: ${perfil.altura || 'no especificada'} cm
+- Nivel de actividad: ${perfil.actividad || 'no especificado'}
+- Experiencia entrenando: ${perfil.experiencia || 'no especificada'}
+- Objetivo principal: ${perfil.objetivo || 'no especificado'}
+- Días de entrenamiento por semana: ${perfil.diasSemana || 3}
+- Dónde entrena: ${perfil.modalidad || 'no especificado'}
+- Equipo disponible: ${equipoTexto}
+- Lesiones, condiciones de salud o restricciones físicas: ${restricciones}
 
-- Objetivo alimenticio: ${nutricion.objetivo || 'no especificado'}
-- Objetivo de entrenamiento (para alinear las recetas si aplica): ${objetivoFitness || 'no especificado'}
-- Comidas que hace normalmente: ${comidasTexto}
-- Restricciones o alergias alimenticias: ${nutricion.restricciones || 'ninguna'}
-- Ingredientes en su despensa (con cantidad disponible y unidad): ${despensaTexto}
-
-Genera exactamente 3 recetas que aprovechen al máximo los ingredientes de la despensa, respetando estrictamente las restricciones o alergias indicadas. Es aceptable sugerir 1-2 ingredientes adicionales que la persona probablemente necesite comprar, pero prioriza usar lo que ya tiene. Alinea las recetas con el objetivo alimenticio y, si aplica, con el objetivo de entrenamiento.
-
-Para cada ingrediente que uses de la despensa, indica la cantidad exacta que la receta consume, usando la MISMA unidad que tiene ese ingrediente en la despensa (g, kg, ml, l o unidades), y sin exceder la cantidad disponible. No inventes una unidad distinta a la que ya tiene el ingrediente en la despensa.
+Genera un plan de exactamente ${perfil.diasSemana || 3} días de entrenamiento, cada uno enfocado en un grupo muscular o tipo de entrenamiento distinto y coherente con el objetivo. Respeta estrictamente las restricciones físicas indicadas (evita ejercicios que las agraven). Usa solo ejercicios posibles con el equipo disponible.
 
 Devuelve ÚNICAMENTE un array JSON válido (sin texto antes ni después, sin markdown), con esta forma exacta:
 [
   {
-    "nombre": "nombre de la receta",
-    "tiempo": "ej. 20 min",
-    "macros": { "proteina": "ej. 30g", "carbos": "ej. 40g", "grasas": "ej. 12g" },
-    "ingredientesUsados": [ { "nombre": "ingrediente de la despensa", "cantidad": 200, "unidad": "g" } ],
-    "ingredientesFaltantes": [ { "nombre": "ingrediente que necesita comprar", "cantidad": 1, "unidad": "unidades" } ],
-    "pasos": ["paso 1 breve", "paso 2 breve", "paso 3 breve"]
+    "nombre": "nombre del día, ej. Día 1 - Pecho y tríceps",
+    "ejercicios": [
+      { "nombre": "nombre del ejercicio", "series": "ej. 4x10", "descanso": "ej. 60 seg" }
+    ]
   }
 ]
 
