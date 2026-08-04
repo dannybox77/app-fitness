@@ -7,7 +7,9 @@ exports.handler = async function (event) {
     const perfil = JSON.parse(event.body || '{}');
 
     const restricciones = perfil.restricciones || 'ninguna';
-    const equipoTexto = (perfil.equipo && perfil.equipo.length) ? perfil.equipo.join(', ') : 'sin equipo especificado';
+    const equipoTexto = perfil.modalidad === 'gimnasio'
+  ? 'gimnasio completo (mancuernas, barras, discos, máquinas de poleas, máquinas guiadas, banco, barra de dominadas, etc. — usa variedad de equipo, no solo mancuernas)'
+  : (perfil.equipo && perfil.equipo.length) ? perfil.equipo.join(', ') : 'sin equipo especificado';
 
     const prompt = `Eres un entrenador personal experto. Diseña un plan de entrenamiento semanal a la medida según este perfil:
 
