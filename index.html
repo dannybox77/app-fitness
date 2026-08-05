@@ -195,6 +195,14 @@
           <div class="chip-opt" data-v="colchoneta">Colchoneta</div>
         </div>
       </div>
+      <div class="field">
+        <label>¿Qué quieres enfatizar en tus días de entrenamiento?</label>
+        <div class="chip-group" id="p-enfasis">
+          <div class="chip-opt" data-v="balanceado">Balanceado (recomendado)</div>
+          <div class="chip-opt" data-v="mas-piernas">Más énfasis en piernas</div>
+          <div class="chip-opt" data-v="mas-superior">Más énfasis en tren superior</div>
+        </div>
+      </div>
       <div class="two-col">
         <div class="field">
           <label>¿Fumas?</label>
@@ -337,6 +345,7 @@
       <div id="pendientesList" style="margin-top:16px;"></div>
     </div>
   </div>
+
   <div id="viewProgreso" style="display:none;">
     <div class="three-col">
       <div class="card" style="text-align:center;">
@@ -617,6 +626,12 @@ document.querySelectorAll('#p-modalidad .chip-opt').forEach(c=>{
 document.querySelectorAll('#p-equipo .chip-opt').forEach(c=>{
   c.addEventListener('click', ()=>{ c.classList.toggle('sel'); });
 });
+document.querySelectorAll('#p-enfasis .chip-opt').forEach(c=>{
+  c.addEventListener('click', ()=>{
+    document.querySelectorAll('#p-enfasis .chip-opt').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+  });
+});
 document.querySelectorAll('#n-objetivo .chip-opt').forEach(c=>{
   c.addEventListener('click', ()=>{
     document.querySelectorAll('#n-objetivo .chip-opt').forEach(x=>x.classList.remove('sel'));
@@ -850,6 +865,7 @@ async function loadPerfil(){
   const equipoSel = perfil.equipo || [];
   document.querySelectorAll('#p-equipo .chip-opt').forEach(c=>c.classList.toggle('sel', equipoSel.includes(c.dataset.v)));
   document.getElementById('equipoField').style.display = (perfil.modalidad==='casa' || perfil.modalidad==='hibrido') ? 'block' : 'none';
+  document.querySelectorAll('#p-enfasis .chip-opt').forEach(c=>c.classList.toggle('sel', c.dataset.v === (perfil.enfasis || 'balanceado')));
 }
 
 async function guardarPerfil(){
@@ -862,6 +878,7 @@ async function guardarPerfil(){
   const alcoholSel = document.querySelector('#p-alcohol .chip-opt.sel');
   const modalidadSel = document.querySelector('#p-modalidad .chip-opt.sel');
   const equipoSel = Array.from(document.querySelectorAll('#p-equipo .chip-opt.sel')).map(c=>c.dataset.v);
+  const enfasisSel = document.querySelector('#p-enfasis .chip-opt.sel');
   const data = {
     nombre: document.getElementById('p-nombre').value.trim(),
     edad: Number(document.getElementById('p-edad').value)||null,
@@ -878,6 +895,7 @@ async function guardarPerfil(){
     alcohol: alcoholSel ? alcoholSel.dataset.v : '',
     modalidad: modalidadSel ? modalidadSel.dataset.v : '',
     equipo: equipoSel,
+    enfasis: enfasisSel ? enfasisSel.dataset.v : 'balanceado',
     restricciones: document.getElementById('p-restricciones').value.trim()
   };
   try{
@@ -894,9 +912,9 @@ function subscribeRutinas(){
     rutinas = snap.docs.map(d=>({ id:d.id, ...d.data() }));
     renderRutinas();
   }, err=>{ showToast('No se pudo sincronizar: '+err.message); });
-  }
-  
-  function progresoRef(){ return db.collection('users').doc(currentUser.uid).collection('progreso').doc('data'); }
+}
+
+function progresoRef(){ return db.collection('users').doc(currentUser.uid).collection('progreso').doc('data'); }
 
 let progreso = { diaActual: 1, historial: [] };
 
@@ -917,7 +935,6 @@ function actualizarCheckinBanner(){
   }
   const dia = progreso.diaActual || 1;
   document.getElementById('checkinTitulo').textContent = `Día ${dia} de ${totalDias}`;
-  banner.style.display = 'flex' === banner.style.display ? 'flex' : 'block';
   banner.style.display = 'block';
 }
 
@@ -1016,7 +1033,8 @@ function renderProgreso(){
 
   dibujarGraficaProgreso(historial);
 }
-  let progresoChart = null;
+
+let progresoChart = null;
 
 function dibujarGraficaProgreso(historial){
   const canvas = document.getElementById('prog-chart');
@@ -1053,7 +1071,6 @@ function dibujarGraficaProgreso(historial){
     }
   });
 }
-
 
 const objetivoLabels = {
   'perder-grasa':'Perder grasa', 'ganar-musculo':'Ganar músculo', 'recomposicion':'Recomposición',
