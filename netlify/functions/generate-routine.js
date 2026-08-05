@@ -6,38 +6,53 @@ exports.handler = async function (event) {
   try {
     const perfil = JSON.parse(event.body || '{}');
 
-    const restricciones = perfil.restricciones || 'ninguna';
     const equipoTexto = perfil.modalidad === 'gimnasio'
-  ? 'gimnasio completo (mancuernas, barras, discos, máquinas de poleas, máquinas guiadas, banco, barra de dominadas, etc. — usa variedad de equipo, no solo mancuernas)'
-  : (perfil.equipo && perfil.equipo.length) ? perfil.equipo.join(', ') : 'sin equipo especificado';
+      ? 'gimnasio completo (mancuernas, barras, discos, máquinas de poleas, máquinas guiadas, banco, barra de dominadas, etc. — usa variedad de equipo, no solo mancuernas)'
+      : (perfil.equipo && perfil.equipo.length) ? perfil.equipo.join(', ') : 'sin equipo (solo peso corporal)';
+    const enfasis = perfil.enfasis || 'balanceado';
+    const enfasisTexto = {
+      'balanceado': 'Reparte los días de forma equilibrada y natural entre tren superior y tren inferior (piernas), según el número total de días.',
+      'mas-piernas': 'Dale más peso al tren inferior (piernas y glúteos) que al tren superior: dedica la MAYORÍA de los días de la semana a piernas, dejando solo los días restantes para tren superior. Por ejemplo, con 3 días: 2 de piernas y 1 de tren superior; con 5 días: 3 de piernas y 2 de tren superior.',
+      'mas-superior': 'Dale más peso al tren superior (pecho, espalda, brazos) que a piernas: dedica la MAYORÍA de los días de la semana a tren superior, dejando solo los días restantes para piernas. Por ejemplo, con 3 días: 2 de tren superior y 1 de piernas; con 5 días: 3 de tren superior y 2 de piernas.'
+    }[enfasis];
 
-    const prompt = `Eres un entrenador personal experto. Diseña un plan de entrenamiento semanal a la medida según este perfil:
+    const prompt = `Eres un entrenador personal experto. Genera un plan de entrenamiento semanal personalizado para esta persona:
 
-- Sexo: ${perfil.sexo || 'no especificado'}
 - Edad: ${perfil.edad || 'no especificada'}
 - Peso: ${perfil.peso || 'no especificado'} kg
 - Altura: ${perfil.altura || 'no especificada'} cm
+- Sexo: ${perfil.sexo || 'no especificado'}
 - Nivel de actividad: ${perfil.actividad || 'no especificado'}
 - Experiencia entrenando: ${perfil.experiencia || 'no especificada'}
-- Objetivo principal: ${perfil.objetivo || 'no especificado'}
+- Fuma: ${perfil.fuma || 'no especificado'}
+- Consume alcohol: ${perfil.alcohol || 'no especificado'}
+- Objetivo principal: ${perfil.objetivo || 'salud general'}
 - Días de entrenamiento por semana: ${perfil.diasSemana || 3}
-- Dónde entrena: ${perfil.modalidad || 'no especificado'}
-- Equipo disponible: ${equipoTexto}
-- Lesiones, condiciones de salud o restricciones físicas: ${restricciones}
+- Dónde entrena: ${perfil.modalidad || 'gimnasio'}
+- Equipo disponible en casa: ${equipoTexto}
+- Lesiones, condiciones de salud o restricciones físicas: ${perfil.restricciones || 'ninguna'}
 
-Genera un plan de exactamente ${perfil.diasSemana || 3} días de entrenamiento, cada uno enfocado en un grupo muscular o tipo de entrenamiento distinto y coherente con el objetivo. Respeta estrictamente las restricciones físicas indicadas (evita ejercicios que las agraven). Usa solo ejercicios posibles con el equipo disponible.
+Ajusta el plan según todos estos factores:
+- Si la experiencia es "principiante", usa ejercicios más simples, menor volumen, y prioriza técnica sobre intensidad. Si es "avanzado", puedes incluir mayor volumen y ejercicios más exigentes.
+- Si fuma o consume alcohol con frecuencia, sé más conservador con el volumen de cardio de alta intensidad y progresa gradualmente.
+- Respeta estrictamente cualquier lesión o condición de salud indicada — evita ejercicios que la agraven y sugiere alternativas seguras.
+- Ajusta el énfasis según el sexo indicado: si es "mujer", dale más volumen (más ejercicios y series) a piernas y glúteos; si es "hombre", dale más volumen a pecho, espalda y brazos; si no se especificó, reparte el volumen de forma equilibrada entre todos los grupos musculares.
+- Distribución de días entre tren superior y piernas: ${enfasisTexto}
+- Si "dónde entrena" es "gimnasio", asume acceso a equipo completo de gimnasio (pesas libres, máquinas, barras) en todos los días.
+- Si es "casa", usa ÚNICAMENTE el equipo disponible en casa que se listó arriba (si dice "sin equipo", usa solo ejercicios de peso corporal) en todos los días.
+- Si es "híbrido", combina días de gimnasio (con equipo completo) y días de casa (usando solo el equipo de casa listado) de forma realista y equilibrada — evita agrupar todos los días de un mismo lugar seguidos uno tras otro. En el "nombre" de cada día, indica claramente si es "(Gimnasio)" o "(Casa)" al final, por ejemplo: "Día 1 — Empuje (Gimnasio)" o "Día 2 — Piernas (Casa)".
 
 Devuelve ÚNICAMENTE un array JSON válido (sin texto antes ni después, sin markdown), con esta forma exacta:
 [
   {
-    "nombre": "nombre del día, ej. Día 1 - Pecho y tríceps",
+    "nombre": "Día 1 — nombre del enfoque de ese día",
     "ejercicios": [
       { "nombre": "nombre del ejercicio", "series": "ej. 4x10", "descanso": "ej. 60 seg" }
     ]
   }
 ]
 
-Responde solo con el JSON.`;
+El array debe tener exactamente ${perfil.diasSemana || 3} elementos (uno por día). Cada día debe tener entre 4 y 8 ejercicios, apropiados para el objetivo, el sexo, la experiencia, el lugar de entrenamiento, el equipo disponible, las restricciones y la distribución de énfasis indicadas. No repitas el mismo grupo muscular en días consecutivos si hay más de 2 días. Responde solo con el JSON.`;
 
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -48,7 +63,7 @@ Responde solo con el JSON.`;
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 2500,
+        max_tokens: 3000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
